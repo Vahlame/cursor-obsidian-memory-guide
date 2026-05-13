@@ -11,6 +11,8 @@ Each file in this directory captures one design decision: what was chosen, what 
 | [ADR-0005](./0005-powershell-5-compatible-json-merge.md) | Use PowerShell 5.1-compatible JSON merging | Accepted |
 | [ADR-0006](./0006-no-runnable-scripts-in-this-repo.md) | Scripts live in the user's vault, not in this repo | Accepted |
 | [ADR-0007](./0007-windows-first-pattern.md) | Windows-first; other platforms via separate prompt variants | Accepted |
+| [ADR-0008](./0008-vault-doctor-as-canonical-tool.md) | Ship `Vault-Doctor.ps1` as the canonical vault health audit alongside `Doctor.ps1` | Accepted |
+| [ADR-0009](./0009-frontmatter-and-three-level-reading-flow.md) | Default vault layout with YAML frontmatter and a three-level agent reading flow | Accepted |
 
 ## Template
 

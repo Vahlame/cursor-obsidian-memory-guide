@@ -18,7 +18,11 @@ The IDE this pattern is built for. Specifically Cursor Desktop on Windows. The w
 
 ### Doctor
 
-`Doctor.ps1`. The end-to-end validation script that the prompt generates. Reports `[OK]`, `[WARN]`, `[FAIL]` per check and exits non-zero on any failure.
+`Doctor.ps1`. The end-to-end **connectivity** validation script that the prompt generates. Checks git/node/npm, vault path, `mcp.json` shape, MCP `/health`, and that both scheduled tasks exist. Reports `[OK]`, `[WARN]`, `[FAIL]` per check and exits non-zero on any failure.
+
+### Vault Doctor
+
+`Vault-Doctor.ps1`. The **content hygiene** audit script (Markdown sizes, duplicate `##` headings, empty directories, YAML frontmatter coverage, broken `[[wikilinks]]`, secret-like regex hits, whether tasks invoke `powershell.exe` directly, presence of `.gitignore`, stale installer files at vault root). Exits `1` only if there is at least one `[FAIL]` (for example a secret pattern match). Optional `-WriteReview` writes `REVIEW_YYYY-MM-DD.md` at the vault root. See ADR-0008.
 
 ### Health endpoint
 

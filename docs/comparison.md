@@ -1,6 +1,6 @@
 # Comparison
 
-How this pattern stacks up against the obvious alternatives. Last updated with this repo's `v1.0.0`. Each row is a one-line opinion; read the corresponding section for the nuance.
+How this pattern stacks up against the obvious alternatives. Last updated with this repo's `v1.1.0`. Each row is a one-line opinion; read the corresponding section for the nuance.
 
 | Feature | This pattern | Cursor built-in memory | mem0 | Letta / MemGPT | Custom RAG (e.g. pgvector) |
 |---|---|---|---|---|---|

@@ -17,7 +17,7 @@ Nothing here is meant to be cloned and run directly. The only intended usage is:
 | Path | Type | Purpose | Consume how |
 |---|---|---|---|
 | `README.md` / `README.en.md` | doc | Human onboarding, 30-min TL;DR (ES / EN). | Read for orientation. |
-| `PROMPT_ULTRA_COMPLETO.md` | prompt | The operational brief the user pastes into Cursor. Contains literal scripts (sections 8.1-8.10), user rules (section 9), validation commands (section 10), and known-error table (section 11). | Copy entire file content into a Cursor chat. |
+| `PROMPT_ULTRA_COMPLETO.md` | prompt | The operational brief the user pastes into Cursor. Contains literal scripts (sections 8.1-8.12), user rules (section 9), validation commands (section 10), and known-error table (section 11). | Copy entire file content into a Cursor chat. |
 | `AGENTS.md` | meta | This file. Agent-readable map of the repo. | Read first if you are an agent. |
 | `manifest.json` | meta | Same map in JSON for programmatic consumption. | Parse for structured access. |
 | `schema.json` | meta | JSON Schema for `manifest.json`. | Use for validation. |
@@ -64,4 +64,4 @@ Nothing here is meant to be cloned and run directly. The only intended usage is:
 - Repository purpose tags: `cursor-memory`, `obsidian-mcp`, `windows`, `agent-onboarding-prompt`.
 - Primary artifact: `PROMPT_ULTRA_COMPLETO.md`.
 - Manifest schema: `schema.json` (`schemaVersion: 1`).
-- Current prompt version: `1.0.0` (see `CHANGELOG.md`).
+- Current prompt version: `1.1.0` (see `CHANGELOG.md`).

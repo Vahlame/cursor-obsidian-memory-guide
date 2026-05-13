@@ -62,9 +62,12 @@ Los modelos no guardan memoria infinita entre sesiones. Lo que se ve como "memor
 
 La estrategia practica es externalizar memoria en archivos Markdown versionados:
 
+- `START_HERE.md`: mapa de lectura para el agente (siempre primero).
 - `MEMORY.md`: reglas/preferencias globales y duraderas.
 - `SESSION_LOG.md`: bitacora cronologica de decisiones.
 - `PROJECTS/<proyecto>.md`: contexto y decisiones por proyecto.
+- `RULES/<proyecto>.md`, `PROJECTS/<proyecto>/SPRINTS.md`, `RUNBOOK.md`: bajo demanda.
+- `KNOWN_FAILURES.md` y `TAGS.md`: indices y anti-patrones.
 
 Cursor consume y muta esa memoria via MCP (Model Context Protocol). Git/GitHub la replica entre dispositivos.
 
@@ -119,6 +122,8 @@ Rutas y puertos canonicos:
 12. Cada script con efectos persistentes (sync, watchdog) escribe un log rotatorio en `%LOCALAPPDATA%\cursor-memory\logs\` via `Start-Transcript`. Asi cuando una tarea programada falla el diagnostico es trivial.
 13. El sistema entrega un `Uninstall-Cursor-Memory.ps1` reversible: borra ambas tareas, restaura `mcp.json.bak` cuando existe, y NUNCA toca el vault. Confianza primero.
 14. El sistema entrega un `Repair.ps1` que reaplica 6.4 + 6.6 + 6.7 sin reclonar el vault. Util cuando el vault esta sano pero el resto de la instalacion drifteo.
+15. El vault por defecto incluye `START_HERE.md`, `TAGS.md`, `KNOWN_FAILURES.md`, carpeta `RULES/` (con `.gitkeep`), `.gitignore` en la raiz, y frontmatter YAML en los Markdown que el setup crea desde cero. Las User Rules (seccion 9) imponen un flujo de lectura en tres niveles para no sobrecargar contexto.
+16. `Vault-Doctor.ps1` audita salud del *contenido* del vault (tamanos, duplicados de seccion, cobertura de frontmatter, wikilinks rotos, patrones tipo secreto, tareas que invocan `powershell.exe` directo). Complementa a `Doctor.ps1`, que sigue siendo el smoke de conectividad (git, node, mcp.json, health, tareas).
 
 ---
 
@@ -171,12 +176,17 @@ Ejecutar en este orden y, ante cualquier falla, ofrecer el fix exacto antes de d
 
 ### 6.3 Estructura minima del vault
 
-Crea solo si no existen:
+Crea carpetas si no existen: `PROJECTS/`, `RULES/`, `scripts/windows/`.
 
-- `MEMORY.md` con encabezado `# MEMORY`.
-- `SESSION_LOG.md` con encabezado `# SESSION LOG`.
-- `PROJECTS/TEMPLATE.md` con plantilla minima.
-- carpetas: `PROJECTS/`, `SNIPPETS/`, `scripts/windows/`.
+Crea archivos **solo si no existen** (vaults legacy: agrega lo que falta sin borrar notas del usuario):
+
+- `MEMORY.md`, `SESSION_LOG.md` con frontmatter YAML y cuerpo minimo (ver 8.1).
+- `START_HERE.md`, `TAGS.md`, `KNOWN_FAILURES.md` (scaffold con frontmatter).
+- `PROJECTS/TEMPLATE.md`, `PROJECTS/_index.md`.
+- `RULES/.gitkeep` (para que Git trackee la carpeta vacia).
+- `.gitignore` en la raiz del vault (secretos, `REVIEW_*.md`, logs, workspace ruidoso de Obsidian).
+
+No crear `SNIPPETS/` por defecto (suele quedar vacio); el usuario puede agregarla si la necesita.
 
 ### 6.4 mcp.json (configuracion Cursor)
 
@@ -210,8 +220,9 @@ Lista exacta a crear/actualizar:
 5. `Enable-MCP-Watchdog.ps1`
 6. `Enable-AutoSync.ps1`
 7. `Doctor.ps1`
-8. `Uninstall-Cursor-Memory.ps1`
-9. `Repair.ps1`
+8. `Vault-Doctor.ps1`
+9. `Uninstall-Cursor-Memory.ps1`
+10. `Repair.ps1`
 
 Estos scripts viven SOLO en el vault del usuario; no se buscan ni descargan de ningun repo externo.
 
@@ -233,13 +244,15 @@ Generar el bloque exacto de seccion 9. Mostrarlo al usuario para que lo pegue en
 
 ### 6.9 Validacion end to end
 
-Ejecutar `Doctor.ps1` y reportar:
+Ejecutar `Doctor.ps1` y `Vault-Doctor.ps1` y reportar:
 
 - prerequisitos OK,
 - vault existe,
 - mcp.json correcto,
 - health 200,
 - ambas tareas existen y ultima ejecucion = 0.
+
+Ejecutar `Vault-Doctor.ps1` (sin `-WriteReview` en setup automatico, a menos que el usuario pida reporte en disco) y reportar el resumen `OK / WARN / FAIL`.
 
 Probar tambien un sync manual con `Sync-Memory.ps1` para verificar que git puede push.
 
@@ -299,16 +312,228 @@ if (-not (Test-Path -LiteralPath $VaultPath)) {
 }
 
 Initialize-Directory -Path (Join-Path $VaultPath "PROJECTS")
-Initialize-Directory -Path (Join-Path $VaultPath "SNIPPETS")
+Initialize-Directory -Path (Join-Path $VaultPath "RULES")
 Initialize-Directory -Path (Join-Path $VaultPath "scripts\windows")
 
-$memory = Join-Path $VaultPath "MEMORY.md"
-$session = Join-Path $VaultPath "SESSION_LOG.md"
-$template = Join-Path $VaultPath "PROJECTS\TEMPLATE.md"
+$today = Get-Date -Format "yyyy-MM-dd"
 
-if (-not (Test-Path -LiteralPath $memory)) { Set-Content -Path $memory -Value "# MEMORY" -Encoding UTF8 }
-if (-not (Test-Path -LiteralPath $session)) { Set-Content -Path $session -Value "# SESSION LOG" -Encoding UTF8 }
-if (-not (Test-Path -LiteralPath $template)) { Set-Content -Path $template -Value "# <proyecto>" -Encoding UTF8 }
+$memory = Join-Path $VaultPath "MEMORY.md"
+if (-not (Test-Path -LiteralPath $memory)) {
+    $body = @"
+---
+type: memory
+tags: [global, preferences]
+status: active
+created: $today
+updated: $today
+---
+
+# MEMORY
+
+Preferencias globales y lecciones transversales. Lo que aplica a *todos* los proyectos.
+
+- Separar hechos de hipotesis con la palabra explicita.
+- No guardar secretos, tokens ni Hardware IDs literales.
+- Ver START_HERE.md para el flujo de lectura del agente.
+"@
+    Set-Content -Path $memory -Value $body.TrimEnd() -Encoding UTF8
+}
+
+$session = Join-Path $VaultPath "SESSION_LOG.md"
+if (-not (Test-Path -LiteralPath $session)) {
+    $body = @"
+---
+type: session-log
+tags: [history]
+status: current-quarter
+created: $today
+updated: $today
+---
+
+# SESSION LOG
+
+Bitacora cronologica. Append-only. Rotar a SESSION_LOG_YYYY-Q<n>.md si supera ~500 lineas.
+
+## $today
+
+- Instalacion inicial del vault (Cursor + Obsidian MCP + GitHub).
+"@
+    Set-Content -Path $session -Value $body.TrimEnd() -Encoding UTF8
+}
+
+$startHere = Join-Path $VaultPath "START_HERE.md"
+if (-not (Test-Path -LiteralPath $startHere)) {
+    $body = @"
+---
+type: index
+tags: [start, navigation]
+status: active
+created: $today
+updated: $today
+---
+
+# START HERE
+
+Mapa del vault. El agente lee esto primero en cada tarea.
+
+## Flujo sugerido
+
+1. Detectar proyecto actual (carpeta o repo abierto en Cursor).
+2. Leer este archivo.
+3. Leer MEMORY.md.
+4. Leer o crear PROJECTS/<proyecto>.md (nombre del proyecto).
+5. Bajo demanda: RULES/<proyecto>.md, PROJECTS/<proyecto>/SPRINTS.md, RUNBOOK.md, KNOWN_FAILURES.md, TAGS.md.
+
+## Doctor del contenido del vault
+
+    powershell -ExecutionPolicy Bypass -File ""$VaultPath\scripts\windows\Vault-Doctor.ps1"" -VaultPath ""$VaultPath""
+
+Opcional: agregar -WriteReview para generar REVIEW_YYYY-MM-DD.md en la raiz del vault.
+
+## Proyectos
+
+Ver PROJECTS/_index.md para la lista sugerida.
+"@
+    Set-Content -Path $startHere -Value $body.TrimEnd() -Encoding UTF8
+}
+
+$tags = Join-Path $VaultPath "TAGS.md"
+if (-not (Test-Path -LiteralPath $tags)) {
+    $body = @"
+---
+type: index
+tags: [meta, tags-reference]
+status: active
+created: $today
+updated: $today
+---
+
+# TAGS
+
+Referencia minima de frontmatter.
+
+## type (YAML)
+
+- memory, session-log, index, project, project-history, runbook, rule, failure, review
+
+## status (YAML)
+
+- active, current-quarter, append-only, frozen, deprecated
+
+Al agregar tags nuevos, documentarlos aqui en la misma sesion.
+"@
+    Set-Content -Path $tags -Value $body.TrimEnd() -Encoding UTF8
+}
+
+$known = Join-Path $VaultPath "KNOWN_FAILURES.md"
+if (-not (Test-Path -LiteralPath $known)) {
+    $body = @"
+---
+type: failure
+tags: [anti-patterns]
+status: active
+created: $today
+updated: $today
+---
+
+# KNOWN FAILURES
+
+Caminos descartados y por que. Una entrada por idea: fecha, contexto, alternativa adoptada.
+"@
+    Set-Content -Path $known -Value $body.TrimEnd() -Encoding UTF8
+}
+
+$gitkeep = Join-Path $VaultPath "RULES\.gitkeep"
+if (-not (Test-Path -LiteralPath $gitkeep)) {
+    Set-Content -Path $gitkeep -Value "" -Encoding UTF8
+}
+
+$gitignore = Join-Path $VaultPath ".gitignore"
+if (-not (Test-Path -LiteralPath $gitignore)) {
+    $gi = @'
+# Secretos / credenciales
+.env
+.env.*
+*.key
+*.pfx
+*.p12
+*.pem
+service-account.json
+
+# Backups locales
+*.bak
+*.old
+*.orig
+*~
+
+# Reviews efimeros del Vault-Doctor
+REVIEW_*.md
+
+# Logs (Start-Transcript)
+logs/
+scripts/windows/logs/
+
+# Obsidian: archivos que cambian por usuario
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/workspaces.json
+.obsidian/cache/
+
+# Sistema
+Thumbs.db
+Desktop.ini
+.DS_Store
+'@
+    Set-Content -Path $gitignore -Value $gi.TrimEnd() -Encoding UTF8
+}
+
+$template = Join-Path $VaultPath "PROJECTS\TEMPLATE.md"
+if (-not (Test-Path -LiteralPath $template)) {
+    $body = @"
+---
+type: project
+project: TEMPLATE
+tags: [template]
+status: template
+created: $today
+updated: $today
+---
+
+# <proyecto>
+
+## Contexto
+
+- Objetivo:
+- Stack:
+- Repo/ruta:
+
+## Enlaces internos
+
+- Reglas duras: RULES/<proyecto>.md
+- Sprints: PROJECTS/<proyecto>/SPRINTS.md
+"@
+    Set-Content -Path $template -Value $body.TrimEnd() -Encoding UTF8
+}
+
+$pidx = Join-Path $VaultPath "PROJECTS\_index.md"
+if (-not (Test-Path -LiteralPath $pidx)) {
+    $body = @"
+---
+type: index
+tags: [projects, navigation]
+status: active
+created: $today
+updated: $today
+---
+
+# PROJECTS index
+
+Un archivo PROJECTS/<proyecto>.md por proyecto. Carpeta PROJECTS/<proyecto>/ para SPRINTS, RUNBOOK, etc.
+
+Plantilla: PROJECTS/TEMPLATE.md
+"@
+    Set-Content -Path $pidx -Value $body.TrimEnd() -Encoding UTF8
+}
 
 # Si setup se ejecuta desde fuera del vault, copiar los scripts al vault.
 # Si ya estan en el vault (mismo directorio), omitir la copia.
@@ -321,7 +546,8 @@ if ($sourceDir -and ((Resolve-Path $sourceDir).Path -ne (Resolve-Path $targetDir
         "Enable-AutoSync.ps1",
         "Ensure-ObsidianMCP.ps1",
         "Enable-MCP-Watchdog.ps1",
-        "Doctor.ps1"
+        "Doctor.ps1",
+        "Vault-Doctor.ps1"
     )
     foreach ($file in $targets) {
         $src = Join-Path $sourceDir $file
@@ -381,6 +607,7 @@ Set-Content -Path $CursorMcpPath -Value $finalJson -Encoding UTF8
 powershell -ExecutionPolicy Bypass -File (Join-Path $VaultPath "scripts\windows\Enable-MCP-Watchdog.ps1") -VaultPath $VaultPath -Port $Port
 powershell -ExecutionPolicy Bypass -File (Join-Path $VaultPath "scripts\windows\Enable-AutoSync.ps1") -VaultPath $VaultPath -EveryMinutes 10
 powershell -ExecutionPolicy Bypass -File (Join-Path $VaultPath "scripts\windows\Doctor.ps1") -VaultPath $VaultPath -CursorMcpPath $CursorMcpPath -Port $Port
+powershell -ExecutionPolicy Bypass -File (Join-Path $VaultPath "scripts\windows\Vault-Doctor.ps1") -VaultPath $VaultPath
 
 Write-Host ""
 Write-Host "Setup completado."
@@ -681,7 +908,327 @@ exit 1
 
 Uso: validacion end to end. Salida `[OK]/[WARN]/[FAIL]`. Exit `0` si todo en verde.
 
-### 8.8 `Uninstall-Cursor-Memory.ps1`
+### 8.8 `Vault-Doctor.ps1`
+
+```powershell
+<#
+.SYNOPSIS
+    Audits the content and health of the Cursor memory vault.
+
+.DESCRIPTION
+    Cold-runs a series of structural and content checks over the vault:
+    - file size budgets (notes > 30KB / 50KB / SESSION_LOG > 500 lines)
+    - duplicate H2 headings inside a single note
+    - empty directories
+    - notes missing YAML frontmatter
+    - broken [[wikilinks]]
+    - secret patterns (tokens, JWTs, AWS keys, hex blobs)
+    - scheduled tasks that flash a console window (powershell.exe direct)
+    - scheduled tasks pointing at obsolete script directories
+    - presence of .gitignore at the vault root
+
+    Output is human-readable to the console and, optionally, written to
+    a REVIEW_<date>.md note at the vault root.
+
+.NOTES
+    Safe to run anytime; read-only except for the optional review note.
+#>
+
+[CmdletBinding()]
+param(
+    [string]$VaultPath = "$HOME\Documents\cursor-memory-vault",
+    [int]$WarnNoteKb = 30,
+    [int]$FailNoteKb = 50,
+    [int]$WarnSessionLines = 500,
+    [switch]$WriteReview
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Continue"
+
+function Write-Section { param([string]$Name) Write-Host ""; Write-Host "== $Name ==" -ForegroundColor Cyan }
+function Write-Ok { param([string]$Msg) Write-Host "[OK]   $Msg" -ForegroundColor Green }
+function Write-Warn { param([string]$Msg) Write-Host "[WARN] $Msg" -ForegroundColor Yellow }
+function Write-Fail { param([string]$Msg) Write-Host "[FAIL] $Msg" -ForegroundColor Red }
+
+$findings = New-Object System.Collections.ArrayList
+function Add-Finding {
+    param([string]$Severity, [string]$Category, [string]$Message)
+    [void]$findings.Add([pscustomobject]@{
+        Severity = $Severity
+        Category = $Category
+        Message  = $Message
+    })
+    switch ($Severity) {
+        'OK'   { Write-Ok   $Message }
+        'WARN' { Write-Warn $Message }
+        'FAIL' { Write-Fail $Message }
+    }
+}
+
+if (-not (Test-Path -LiteralPath $VaultPath)) {
+    Write-Fail "Vault not found: $VaultPath"
+    exit 2
+}
+
+Write-Host "== Cursor Vault Doctor ==" -ForegroundColor Cyan
+Write-Host "Vault: $VaultPath"
+
+# -- 1. Inventory --------------------------------------------------------
+Write-Section "Inventory"
+$allFiles = @(Get-ChildItem -Recurse -File -Force -LiteralPath $VaultPath |
+    Where-Object { $_.FullName -notmatch '\\\.git\\' -and $_.FullName -notmatch '\\\.obsidian\\' })
+$mdFiles  = @($allFiles | Where-Object { $_.Extension -eq '.md' })
+$ps1Files = @($allFiles | Where-Object { $_.Extension -eq '.ps1' })
+$cmdFiles = @($allFiles | Where-Object { $_.Extension -in '.cmd', '.bat' })
+$vbsFiles = @($allFiles | Where-Object { $_.Extension -eq '.vbs' })
+$totalKb = if ($allFiles.Count -gt 0) {
+    [math]::Round((($allFiles | Measure-Object Length -Sum).Sum) / 1KB, 1)
+} else { 0 }
+
+Add-Finding 'OK' 'inventory' ("{0} total files ({1} .md, {2} .ps1, {3} .cmd, {4} .vbs) - {5} KB" -f `
+    $allFiles.Count, $mdFiles.Count, $ps1Files.Count, $cmdFiles.Count, $vbsFiles.Count, $totalKb)
+
+# -- 2. Size budgets -----------------------------------------------------
+Write-Section "Size budgets"
+foreach ($file in $mdFiles | Sort-Object Length -Descending) {
+    $kb = [math]::Round($file.Length / 1KB, 1)
+    $rel = $file.FullName.Substring($VaultPath.Length + 1)
+    if ($kb -ge $FailNoteKb) {
+        Add-Finding 'FAIL' 'size' ("{0} = {1} KB (>= {2} KB - SPLIT MANDATORY)" -f $rel, $kb, $FailNoteKb)
+    } elseif ($kb -ge $WarnNoteKb) {
+        Add-Finding 'WARN' 'size' ("{0} = {1} KB (>= {2} KB - consider splitting)" -f $rel, $kb, $WarnNoteKb)
+    }
+}
+$sessionLog = Join-Path $VaultPath 'SESSION_LOG.md'
+if (Test-Path -LiteralPath $sessionLog) {
+    $lineCount = (Get-Content -LiteralPath $sessionLog | Measure-Object -Line).Lines
+    if ($lineCount -ge $WarnSessionLines) {
+        Add-Finding 'WARN' 'rotation' ("SESSION_LOG.md = {0} lines (>= {1}, rotate to SESSION_LOG_YYYY-Q<n>.md)" -f $lineCount, $WarnSessionLines)
+    } else {
+        Add-Finding 'OK' 'rotation' ("SESSION_LOG.md = {0} lines" -f $lineCount)
+    }
+}
+
+# -- 3. Duplicate H2 inside a single note --------------------------------
+Write-Section "Duplicate sections"
+foreach ($file in $mdFiles) {
+    $headings = Select-String -LiteralPath $file.FullName -Pattern '^## ' |
+        ForEach-Object { ($_.Line -replace '^##\s+', '').Trim() }
+    $dupes = $headings | Group-Object | Where-Object { $_.Count -gt 1 } | ForEach-Object { $_.Name }
+    if ($dupes) {
+        $rel = $file.FullName.Substring($VaultPath.Length + 1)
+        foreach ($d in $dupes) {
+            Add-Finding 'WARN' 'duplicates' ("{0}: duplicate H2 '{1}'" -f $rel, $d)
+        }
+    }
+}
+
+# -- 4. Empty directories ------------------------------------------------
+Write-Section "Empty directories"
+$emptyDirs = Get-ChildItem -Recurse -Directory -Force -LiteralPath $VaultPath |
+    Where-Object { $_.FullName -notmatch '\\\.git' } |
+    Where-Object { -not (Get-ChildItem -Force -LiteralPath $_.FullName) }
+if ($emptyDirs) {
+    foreach ($d in $emptyDirs) {
+        $rel = $d.FullName.Substring($VaultPath.Length + 1)
+        Add-Finding 'WARN' 'empty-dir' ("{0}\ is empty (delete or populate)" -f $rel)
+    }
+} else {
+    Add-Finding 'OK' 'empty-dir' "No empty directories"
+}
+
+# -- 5. Frontmatter coverage --------------------------------------------
+Write-Section "Frontmatter coverage"
+$missing = @()
+foreach ($file in $mdFiles) {
+    $first = Get-Content -LiteralPath $file.FullName -TotalCount 1
+    if ($first -ne '---') {
+        $missing += $file
+    }
+}
+$pct = if ($mdFiles.Count -gt 0) { [math]::Round(($mdFiles.Count - $missing.Count) * 100.0 / $mdFiles.Count, 0) } else { 0 }
+if ($missing.Count -eq $mdFiles.Count) {
+    Add-Finding 'WARN' 'frontmatter' ("0 of {0} markdown files have frontmatter ({1}% coverage)" -f $mdFiles.Count, $pct)
+} elseif ($missing.Count -gt 0) {
+    Add-Finding 'WARN' 'frontmatter' ("{0} of {1} markdown files missing frontmatter ({2}% coverage)" -f $missing.Count, $mdFiles.Count, $pct)
+} else {
+    Add-Finding 'OK' 'frontmatter' "All markdown files have frontmatter"
+}
+
+# -- 6. Broken [[wikilinks]] --------------------------------------------
+Write-Section "Wikilinks"
+$noteIndex = @{}
+foreach ($f in $mdFiles) {
+    $key = [IO.Path]::GetFileNameWithoutExtension($f.FullName).ToLowerInvariant()
+    $noteIndex[$key] = $true
+    $rel = $f.FullName.Substring($VaultPath.Length + 1) -replace '\\', '/'
+    $relKey = ($rel -replace '\.md$', '').ToLowerInvariant()
+    $noteIndex[$relKey] = $true
+}
+$broken = @()
+foreach ($file in $mdFiles) {
+    if ($file.Name -ieq 'TEMPLATE.md') { continue }
+    $head = Get-Content -LiteralPath $file.FullName -TotalCount 10 -ErrorAction SilentlyContinue
+    if (($head -join "`n") -match '(?im)^status:\s*template\b') { continue }
+    $wikilinkHits = Select-String -LiteralPath $file.FullName -Pattern '\[\[([^\]\|#]+)(?:[#\|][^\]]*)?\]\]' -AllMatches
+    foreach ($m in $wikilinkHits) {
+        foreach ($g in $m.Matches) {
+            $target = $g.Groups[1].Value.Trim()
+            if ($target -match '<.*>') { continue }
+            $key = $target.ToLowerInvariant()
+            if (-not $noteIndex.ContainsKey($key)) {
+                $rel = $file.FullName.Substring($VaultPath.Length + 1)
+                $broken += "$rel -> [[$($g.Groups[1].Value)]]"
+            }
+        }
+    }
+}
+if ($broken) {
+    foreach ($b in $broken | Select-Object -Unique) {
+        Add-Finding 'WARN' 'broken-link' $b
+    }
+} else {
+    Add-Finding 'OK' 'broken-link' "No broken [[wikilinks]] (or vault uses 0 wikilinks)"
+}
+
+# -- 7. Secret patterns -------------------------------------------------
+Write-Section "Secret scan"
+$secretPatterns = @(
+    @{ Name = 'GitHub PAT';      Regex = 'gh[pousr]_[A-Za-z0-9]{36,}' }
+    @{ Name = 'OpenAI key';      Regex = 'sk-(?:proj-)?[A-Za-z0-9\-_]{32,}' }
+    @{ Name = 'Anthropic key';   Regex = 'sk-ant-[A-Za-z0-9\-_]{32,}' }
+    @{ Name = 'AWS access key';  Regex = '\bAKIA[0-9A-Z]{16}\b' }
+    @{ Name = 'JWT';             Regex = '\beyJ[A-Za-z0-9_\-]{20,}\.eyJ[A-Za-z0-9_\-]{20,}\.[A-Za-z0-9_\-]{20,}\b' }
+    @{ Name = 'Generic API key'; Regex = '(?i)\bapi[_-]?key\s*[:=]\s*["'']?[A-Za-z0-9\-_]{20,}["'']?' }
+    @{ Name = 'Hardware ID';     Regex = '(?i)\bhw[_-]?fingerprint\s*[:=]\s*["'']?[0-9a-f]{20,}["'']?' }
+)
+$secretsFound = 0
+foreach ($file in $mdFiles) {
+    foreach ($p in $secretPatterns) {
+        $hits = Select-String -LiteralPath $file.FullName -Pattern $p.Regex -AllMatches
+        if ($hits) {
+            $rel = $file.FullName.Substring($VaultPath.Length + 1)
+            Add-Finding 'FAIL' 'secret' ("{0}: matches {1} (line {2})" -f $rel, $p.Name, $hits[0].LineNumber)
+            $secretsFound++
+        }
+    }
+}
+if ($secretsFound -eq 0) {
+    Add-Finding 'OK' 'secret' "No secret-like patterns detected"
+}
+
+# -- 8. Scheduled tasks ------------------------------------------------
+Write-Section "Scheduled tasks"
+$taskNames = @('CursorObsidianMcpWatchdog', 'CursorMemoryAutoSync')
+foreach ($name in $taskNames) {
+    cmd /c "schtasks /Query /TN `"$name`" >nul 2>nul"
+    if ($LASTEXITCODE -ne 0) {
+        Add-Finding 'WARN' 'task' ("Task '{0}' does not exist" -f $name)
+        continue
+    }
+    $rawXml = cmd /c "schtasks /Query /TN `"$name`" /XML 2>nul"
+    $xmlText = ($rawXml -join "`n").Trim()
+    if (-not $xmlText) {
+        Add-Finding 'WARN' 'task' ("Task '{0}' has no XML body" -f $name)
+        continue
+    }
+    try {
+        [xml]$xml = $xmlText
+    } catch {
+        Add-Finding 'WARN' 'task' ("Task '{0}' XML failed to parse" -f $name)
+        continue
+    }
+    $command = ''
+    $arguments = ''
+    if ($xml.Task.Actions.Exec) {
+        $command = [string]$xml.Task.Actions.Exec.Command
+        $arguments = [string]$xml.Task.Actions.Exec.Arguments
+    }
+    if (-not $command) {
+        Add-Finding 'WARN' 'task' ("Task '{0}' has no Exec action" -f $name)
+        continue
+    }
+    $combined = "$command $arguments"
+    if ($command -match '(?i)powershell\.exe' -or $command -match '(?i)pwsh\.exe') {
+        Add-Finding 'FAIL' 'task' ("Task '{0}' invokes {1} directly (CONSOLE WINDOW WILL FLASH)" -f $name, (Split-Path $command -Leaf))
+    } elseif ($command -match '(?i)wscript\.exe' -and $arguments -match '(?i)\.vbs') {
+        Add-Finding 'OK' 'task' ("Task '{0}' runs hidden via wscript+vbs" -f $name)
+    } else {
+        Add-Finding 'WARN' 'task' ("Task '{0}' uses non-canonical launcher: {1}" -f $name, $command)
+    }
+    if ($combined -match 'cursor-install') {
+        Add-Finding 'WARN' 'task' ("Task '{0}' points at OBSOLETE cursor-install\\ directory" -f $name)
+    } elseif ($combined -match 'scripts\\windows') {
+        Add-Finding 'OK' 'task' ("Task '{0}' points at canonical scripts\\windows\\" -f $name)
+    }
+}
+
+# -- 9. .gitignore --------------------------------------------------------
+Write-Section ".gitignore"
+$gi = Join-Path $VaultPath '.gitignore'
+if (Test-Path -LiteralPath $gi) {
+    Add-Finding 'OK' 'gitignore' ".gitignore exists at vault root"
+} else {
+    Add-Finding 'WARN' 'gitignore' "No .gitignore at vault root (recommend adding .env, *.bak, etc.)"
+}
+
+# -- 10. Stale top-level installer files --------------------------------
+Write-Section "Top-level installer pollution"
+$rootFiles = Get-ChildItem -File -Force -LiteralPath $VaultPath
+$noiseFiles = $rootFiles | Where-Object {
+    $_.Name -match '^(CursorMemory-.*\.cmd|.*Install\.cmd|.*Setup\.cmd|CROSS_DEVICE.*\.md|CURSOR_USER_RULE.*\.md)$'
+}
+if ($noiseFiles) {
+    foreach ($n in $noiseFiles) {
+        Add-Finding 'WARN' 'noise' ("Root file '{0}' should live in scripts\\windows\\ or be archived" -f $n.Name)
+    }
+} else {
+    Add-Finding 'OK' 'noise' "No top-level installer pollution"
+}
+
+# -- Summary -------------------------------------------------------------
+Write-Section "Summary"
+$okCount = @($findings | Where-Object Severity -eq 'OK').Count
+$warnCount = @($findings | Where-Object Severity -eq 'WARN').Count
+$failCount = @($findings | Where-Object Severity -eq 'FAIL').Count
+
+Write-Host ("OK:   {0}" -f $okCount) -ForegroundColor Green
+Write-Host ("WARN: {0}" -f $warnCount) -ForegroundColor Yellow
+Write-Host ("FAIL: {0}" -f $failCount) -ForegroundColor Red
+
+if ($WriteReview.IsPresent) {
+    $reviewPath = Join-Path $VaultPath ("REVIEW_{0}.md" -f (Get-Date -Format 'yyyy-MM-dd'))
+    $lines = @()
+    $lines += "---"
+    $lines += "type: review"
+    $lines += "created: $(Get-Date -Format 'yyyy-MM-dd')"
+    $lines += "tags: [vault-doctor, review]"
+    $lines += "---"
+    $lines += ""
+    $lines += "# Vault Doctor review $(Get-Date -Format 'yyyy-MM-dd HH:mm')"
+    $lines += ""
+    $lines += "OK $okCount  -  WARN $warnCount  -  FAIL $failCount"
+    $lines += ""
+    foreach ($cat in ($findings | Group-Object Category | Sort-Object Name)) {
+        $lines += "## $($cat.Name)"
+        $lines += ""
+        foreach ($f in $cat.Group) {
+            $lines += "- [$($f.Severity)] $($f.Message)"
+        }
+        $lines += ""
+    }
+    Set-Content -LiteralPath $reviewPath -Value ($lines -join "`n") -Encoding UTF8
+    Write-Host ""
+    Write-Host "Review written to: $reviewPath" -ForegroundColor Cyan
+}
+
+if ($failCount -gt 0) { exit 1 } else { exit 0 }
+```
+
+Uso: auditoria de salud del *contenido* del vault (tamanos, duplicados H2, directorios vacios, frontmatter YAML, wikilinks rotos, patrones tipo secreto, tareas que invocan powershell.exe directo, `.gitignore`, archivos de instalador viejos en la raiz). Con `-WriteReview` escribe `REVIEW_YYYY-MM-DD.md` en la raiz. Exit `1` si hay al menos un `[FAIL]`; los `[WARN]` no cambian el exit code.
+
+### 8.9 `Uninstall-Cursor-Memory.ps1`
 
 ```powershell
 param(
@@ -741,7 +1288,7 @@ Write-Host "Uninstall completado. Reinicia Cursor."
 
 Uso: desinstalar limpio. Por defecto preserva el vault (la memoria). Pasar `-RemoveVault` solo si el usuario lo pide explicitamente.
 
-### 8.9 `Repair.ps1`
+### 8.10 `Repair.ps1`
 
 ```powershell
 param(
@@ -777,7 +1324,7 @@ Write-Host "Repair completado. Reinicia Cursor."
 
 Uso: el vault ya existe y esta sano, pero el resto drifteo (tareas borradas, mcp.json sobreescrito, MCP caido). Lee el remote actual del vault, reaplica todo lo demas, no reclona ni toca contenido.
 
-### 8.10 Logging y rotacion
+### 8.11 Logging y rotacion
 
 Ambos scripts con efectos persistentes (`Ensure-ObsidianMCP.ps1`, `Sync-Memory.ps1`) escriben con `Start-Transcript` a:
 
@@ -789,7 +1336,7 @@ Un archivo por dia, append durante el dia. Para inspeccionar fallos de tareas pr
 
 `SESSION_LOG.md` no rota automaticamente. Recomendacion: cuando supere ~500 lineas, moverlo manualmente a `SESSION_LOG_YYYY-Q<n>.md` y arrancar uno nuevo. El agente debe reconocer ambos formatos al leer.
 
-### 8.11 Tabla de cuando usar cada script
+### 8.12 Tabla de cuando usar cada script
 
 | Caso | Script |
 |------|--------|
@@ -798,7 +1345,8 @@ Un archivo por dia, append durante el dia. Para inspeccionar fallos de tareas pr
 | MCP marcado como no disponible en Cursor | `Ensure-ObsidianMCP.ps1` |
 | Recrear watchdog porque dejo de levantar MCP | `Enable-MCP-Watchdog.ps1` |
 | Recrear auto-sync porque dejo de subir | `Enable-AutoSync.ps1` |
-| Diagnostico end-to-end | `Doctor.ps1` |
+| Diagnostico end-to-end (git, node, mcp, health, tareas) | `Doctor.ps1` |
+| Auditoria del vault Markdown (tamanos, frontmatter, wikilinks, secretos, launcher de tareas) | `Vault-Doctor.ps1` (opcional `-WriteReview`) |
 | Vault sano pero tareas/mcp.json drifteados | `Repair.ps1` |
 | Desinstalar todo, preservando el vault | `Uninstall-Cursor-Memory.ps1` |
 | Desinstalar todo y borrar el vault | `Uninstall-Cursor-Memory.ps1 -RemoveVault` |
@@ -810,31 +1358,58 @@ Un archivo por dia, append durante el dia. Para inspeccionar fallos de tareas pr
 Generar este bloque y mostrarlo al usuario tal cual. Indicarle: `Cursor Settings -> Rules -> User Rules -> pegar -> guardar`.
 
 ```text
-Reglas de memoria persistente con MCP obsidian-memory.
+Siempre que este disponible el servidor MCP `obsidian-memory`, sigue este flujo:
 
-Antes de cada respuesta sustantiva:
-- intenta leer MEMORY.md y, si aplica, PROJECTS/<proyecto>.md.
-- si obsidian-memory no esta disponible, indicalo de forma breve y continua sin memoria.
+0. ARRANQUE (siempre, sin excepcion):
+   - leer `START_HERE.md`
+   - detectar el proyecto actual (nombre de carpeta / repo)
 
-Durante la conversacion:
-- detecta el proyecto actual desde la carpeta o el repo del workspace.
-- registra decisiones tecnicas en PROJECTS/<proyecto>.md.
-- haz checkpoint cada 3 a 5 mensajes solo si hubo avance real.
-- no escribas por escribir; evita ruido y duplicados.
+1. CONTEXTO BASE (siempre, antes de proponer cambios):
+   - leer `MEMORY.md`
+   - usar o crear `PROJECTS/<proyecto>.md`
+   - leer `PROJECTS/<proyecto>.md` si existe
 
-Al cerrar una tarea:
-- agrega 2 a 5 lineas en SESSION_LOG.md con fecha, proyecto, contexto y decision.
-- promueve a MEMORY.md solo lo durable o global (preferencias, reglas transversales).
+2. CONTEXTO ON-DEMAND (solo si la tarea lo requiere):
+   - reglas duras / restricciones del proyecto -> `RULES/<proyecto>.md`
+   - historia de sprints / decisiones cerradas -> `PROJECTS/<proyecto>/SPRINTS.md`
+   - comandos diarios / runbook -> `PROJECTS/<proyecto>/RUNBOOK.md`
+   - si la tarea parece deja vu -> `KNOWN_FAILURES.md`
+   - cuando se agreguen tags nuevos -> `TAGS.md`
 
-Calidad y seguridad:
-- separa hechos de hipotesis.
-- nunca guardes secretos, tokens, contrasenas ni claves.
-- evita pegar dumps con datos sensibles.
+3. DURANTE LA TAREA:
+   - registrar decisiones importantes en `PROJECTS/<proyecto>.md` o en `PROJECTS/<proyecto>/SPRINTS.md` si es un sprint cerrado
+   - checkpoint cada 3-5 mensajes solo si hubo avance real
+   - si no hubo cambios relevantes, NO escribir por escribir
+   - jamas guardar secretos, tokens, JWTs, Hardware IDs literales
 
-Estilo:
-- entradas cortas y accionables.
-- formato Markdown limpio.
-- fechas en formato YYYY-MM-DD.
+4. AL CERRAR LA TAREA:
+   - append breve en `SESSION_LOG.md` (fecha + proyecto + contexto + decision/resultado)
+   - si es aprendizaje duradero y transversal -> `MEMORY.md`
+   - si es regla dura nueva del proyecto -> `RULES/<proyecto>.md`
+   - si es camino descartado -> `KNOWN_FAILURES.md` con motivo
+
+5. ESTILO DE MEMORIA:
+   - entradas cortas y accionables
+   - separar `hechos` de `hipotesis` con la palabra explicita
+   - evitar duplicados (revisar antes de agregar)
+   - usar wikilinks cuando ayude (evitar placeholders con `<` `>` dentro de wikilinks; usar rutas literales o backticks para ejemplos)
+
+6. INDEPENDENCIA POR PROYECTO:
+   - no mezclar decisiones entre proyectos
+   - `MEMORY.md` solo para preferencias globales y lecciones transversales
+   - cada decision tecnica del proyecto vive en su `PROJECTS/<proyecto>.md` o `SPRINTS.md`
+
+7. FRECUENCIA:
+   - no registrar cada prompt individual
+   - registrar por bloques (cada 3-5 mensajes) o cuando haya una decision importante
+   - al final, siempre cerrar con resumen corto en `SESSION_LOG.md`
+
+8. MANTENIMIENTO DEL VAULT:
+   - si `SESSION_LOG.md` supera 500 lineas -> rotar a `SESSION_LOG_YYYY-Q<n>.md`
+   - si una nota de proyecto supera 30 KB -> split en `PROJECTS/<proyecto>/<sub>.md`
+   - cuando se sienta que el vault crecio -> sugerir correr `scripts\windows\Vault-Doctor.ps1 -WriteReview`
+
+Si no hay acceso al MCP, indicar explicitamente que no se pudo persistir memoria.
 ```
 
 ---
@@ -845,6 +1420,10 @@ El agente debe correr estos checks y pegar el resultado en su respuesta final.
 
 ```powershell
 powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Documents\cursor-memory-vault\scripts\windows\Doctor.ps1"
+```
+
+```powershell
+powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Documents\cursor-memory-vault\scripts\windows\Vault-Doctor.ps1"
 ```
 
 ```powershell
@@ -862,7 +1441,8 @@ powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Documents\cursor-memo
 
 Criterios de exito:
 
-- Doctor.ps1 sale `0` y todo `[OK]`.
+- `Doctor.ps1` sale `0` y todo `[OK]`.
+- `Vault-Doctor.ps1` sale `0` (puede mostrar `[WARN]`; cualquier `[FAIL]` requiere accion antes de dar por cerrada la instalacion).
 - health responde `200`.
 - ambas tareas existen y `Ultimo resultado` = `0`.
 - sync manual termina con `Sync completado.`.
@@ -887,9 +1467,7 @@ Criterios de exito:
 | Cursor lista `obsidian-memory` en rojo despues de reiniciar | `mcp-remote` aun no conecto al server | correr `Ensure-ObsidianMCP.ps1` y refrescar la lista MCP en Cursor. |
 | `npx -y mcp-remote` tarda mucho la primera vez | cache npx vacia | esperar ~30s la primera ejecucion, luego es instantaneo. |
 | MCP server arranca pero responde diferente despues de una actualizacion del paquete | `@smith-and-web/obsidian-mcp-server@latest` trajo breaking changes | pinear con `-McpPackage "@smith-and-web/obsidian-mcp-server@<version-conocida>"` en `Ensure-ObsidianMCP.ps1` y recrear el watchdog. |
-| Tarea programada falla pero no hay forma de saber por que | el script no escribia transcript | revisar `%LOCALAPPDATA%\cursor-memory\logs\<script>_YYYY-MM-DD.log`. |
-
----
+| `Vault-Doctor.ps1` muestra `[FAIL]` por patron tipo secreto | texto en el vault parece API key / JWT / PAT | rotar credencial, borrar/reescribir la linea en el vault, re-correr el doctor. |
 
 ## 12. Output que el agente debe entregar al final
 
@@ -902,9 +1480,9 @@ Estructura obligatoria:
 2. Cambios aplicados
    - archivos creados/modificados (rutas absolutas),
    - tareas creadas (`schtasks /Create`).
-3. Scripts entregados y cuando usar cada uno (tabla de seccion 8.8).
+3. Scripts entregados y cuando usar cada uno (tabla de seccion 8.12).
 4. User Rules generadas (bloque de seccion 9, listo para pegar).
-5. Validaciones ejecutadas con resultados (output literal de Doctor.ps1, health, schtasks /Query, sync manual).
+5. Validaciones ejecutadas con resultados (output literal de `Doctor.ps1`, `Vault-Doctor.ps1`, health, `schtasks /Query`, sync manual).
 6. Pasos manuales restantes para el usuario (en este orden):
    1. **reiniciar Cursor** (cerrar todas las ventanas, volver a abrir);
    2. **pegar las User Rules** en `Cursor Settings -> Rules -> User Rules -> Save`;

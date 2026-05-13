@@ -4,7 +4,7 @@
   "name": "cursor-obsidian-memory-guide",
   "title": "Cursor Memory with Obsidian MCP",
   "description": "An operational prompt that lets a Cursor IDE agent set up persistent, cross-device memory for itself using Obsidian MCP and a private GitHub vault on Windows.",
-  "version": "1.0.0",
+  "version": "1.1.0",
   "platform": ["windows"],
   "language": ["es", "en"],
   "primaryArtifact": "PROMPT_ULTRA_COMPLETO.md",
@@ -155,7 +155,7 @@
       "path": "examples/",
       "type": "example",
       "audience": "human",
-      "purpose": "Anonymized sample vault content (MEMORY.md, SESSION_LOG.md, PROJECTS/example-app.md).",
+      "purpose": "Anonymized sample vault (START_HERE, MEMORY, SESSION_LOG, TAGS, KNOWN_FAILURES, RULES stub, .gitignore, PROJECTS template and example-app).",
       "consumeAs": "markdown"
     }
   ],

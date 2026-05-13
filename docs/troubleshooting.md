@@ -126,12 +126,13 @@ Run before any commit. The Preflight check in section 6.1 catches this and promp
 
 If something is wrong and you want to start fresh without touching your vault content, the safe path is:
 
-1. **Diagnose:** `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Documents\cursor-memory-vault\scripts\windows\Doctor.ps1"`. Note every `[FAIL]` and `[WARN]`.
-2. **Repair targeted pieces only**, in this order:
+1. **Diagnose connectivity:** `powershell -ExecutionPolicy Bypass -File "$env:USERPROFILE\Documents\cursor-memory-vault\scripts\windows\Doctor.ps1"`. Note every `[FAIL]` and `[WARN]`.
+2. **Diagnose vault content:** same path but `Vault-Doctor.ps1` (add `-WriteReview` if you want a markdown report file in the vault). `[WARN]` is common on legacy vaults (for example missing frontmatter); fix any `[FAIL]` before treating the install as healthy.
+3. **Repair targeted pieces only**, in this order:
    - `Ensure-ObsidianMCP.ps1` if health is failing.
    - `Enable-MCP-Watchdog.ps1` if the watchdog task is missing.
    - `Enable-AutoSync.ps1` if the autosync task is missing.
-3. **Full rerun:** re-paste the prompt into a new Cursor chat with the same `<REPO_URL_PRIVADO>`. The setup is idempotent: existing vault, scripts, and tasks are preserved or backed up.
-4. **Nuke and restart (last resort):** delete the two scheduled tasks (`schtasks /Delete /TN CursorObsidianMcpWatchdog /F` and the autosync), restore `mcp.json` from `.bak`, and re-paste the prompt.
+4. **Full rerun:** re-paste the prompt into a new Cursor chat with the same `<REPO_URL_PRIVADO>`. The setup is idempotent: existing vault, scripts, and tasks are preserved or backed up.
+5. **Nuke and restart (last resort):** delete the two scheduled tasks (`schtasks /Delete /TN CursorObsidianMcpWatchdog /F` and the autosync), restore `mcp.json` from `.bak`, and re-paste the prompt.
 
 The vault directory itself (`%USERPROFILE%\Documents\cursor-memory-vault`) is never touched destructively, so your memory survives any of the above.

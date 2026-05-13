@@ -1,0 +1,10 @@
+# Example vault — same categories as a real vault (trim as needed)
+.env
+.env.*
+*.bak
+REVIEW_*.md
+logs/
+.obsidian/workspace.json
+.obsidian/workspace-mobile.json
+.obsidian/workspaces.json
+.obsidian/cache/

@@ -4,7 +4,7 @@
     runs PSScriptAnalyzer over them.
 
 .DESCRIPTION
-    The prompt embeds 7 PowerShell scripts inside fenced code blocks. They cannot
+    The prompt embeds multiple PowerShell scripts inside fenced code blocks. They cannot
     be linted in place, so this script parses the markdown, writes each block to
     a temp file with the heading-derived name when possible, and invokes the
     analyzer. Exits non-zero if any error or warning is found.

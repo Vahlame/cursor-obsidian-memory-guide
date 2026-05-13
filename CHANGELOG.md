@@ -6,6 +6,23 @@ The format is based on [Keep a Changelog](https://keepachangelog.com/en/1.1.0/),
 
 ## [Unreleased]
 
+## [1.1.0] - 2026-05-13
+
+### Added
+
+- `Vault-Doctor.ps1` embedded in `PROMPT_ULTRA_COMPLETO.md` (section 8.8): vault content audit (sizes, duplicate H2, empty dirs, YAML frontmatter coverage, wikilinks, secret-like patterns, scheduled-task launchers, `.gitignore`, stale root installer files). Optional `-WriteReview` writes `REVIEW_YYYY-MM-DD.md`.
+- Default vault scaffold from setup: `START_HERE.md`, `TAGS.md`, `KNOWN_FAILURES.md`, `RULES/.gitkeep`, root `.gitignore`, `PROJECTS/_index.md`, and frontmatter on generated Markdown. `SNIPPETS/` removed from the default scaffold.
+- ADR-0008 (Vault-Doctor alongside Doctor) and ADR-0009 (frontmatter + three-level reading flow).
+- Example vault files: `examples/START_HERE.md`, `examples/TAGS.md`, `examples/KNOWN_FAILURES.md`, `examples/RULES/.gitkeep`, `examples/.gitignore`.
+
+### Changed
+
+- Section 9 User Rules in the prompt: three-level flow (START_HERE → MEMORY + PROJECTS → on-demand RULES/SPRINTS/RUNBOOK/KNOWN_FAILURES/TAGS) and maintenance hint for `Vault-Doctor.ps1 -WriteReview`.
+- Section 10 validation: run `Vault-Doctor.ps1` after `Doctor.ps1`; document exit semantics (`FAIL` vs `WARN`).
+- `Setup-Cursor-Memory.ps1` in the prompt: end-of-setup runs `Vault-Doctor.ps1`; copy list includes `Vault-Doctor.ps1`.
+- `README.md` / `README.en.md` prompt version badge to `v1.1.0`.
+- `manifest.json` version to `1.1.0`.
+
 ## [1.0.0] - 2026-05-13
 
 ### Added
@@ -43,5 +60,6 @@ Prior history was undocumented and is summarized only in git log. Highlights:
 - Addition of `AGENTS.md` and `manifest.json` for machine-readable discoverability.
 - Seven hardening fixes for real-world install gaps.
 
-[Unreleased]: https://github.com/Vahlame/cursor-obsidian-memory-guide/compare/v1.0.0...HEAD
+[Unreleased]: https://github.com/Vahlame/cursor-obsidian-memory-guide/compare/v1.1.0...HEAD
+[1.1.0]: https://github.com/Vahlame/cursor-obsidian-memory-guide/releases/tag/v1.1.0
 [1.0.0]: https://github.com/Vahlame/cursor-obsidian-memory-guide/releases/tag/v1.0.0

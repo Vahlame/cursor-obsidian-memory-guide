@@ -1,7 +1,7 @@
 # Cursor Memory with Obsidian MCP
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](./LICENSE)
-[![Prompt version](https://img.shields.io/badge/prompt-v1.0.0-brightgreen.svg)](./CHANGELOG.md)
+[![Prompt version](https://img.shields.io/badge/prompt-v1.1.0-brightgreen.svg)](./CHANGELOG.md)
 [![Tested on](https://img.shields.io/badge/tested-Windows%2011-0078D6.svg)](#supported-platforms)
 [![Lint](https://github.com/Vahlame/cursor-obsidian-memory-guide/actions/workflows/lint.yml/badge.svg)](https://github.com/Vahlame/cursor-obsidian-memory-guide/actions/workflows/lint.yml)
 

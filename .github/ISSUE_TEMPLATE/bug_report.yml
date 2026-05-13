@@ -12,7 +12,7 @@ body:
     attributes:
       label: Prompt version
       description: Tag, commit SHA, or "main".
-      placeholder: v1.0.0
+      placeholder: v1.1.0
     validations:
       required: true
   - type: dropdown
@@ -58,7 +58,7 @@ body:
     id: logs
     attributes:
       label: Relevant output
-      description: Paste `Doctor.ps1` output, scheduled task output, or terminal errors. Redact paths and any sensitive info.
+      description: Paste `Doctor.ps1` and/or `Vault-Doctor.ps1` output, scheduled task output, or terminal errors. Redact paths and any sensitive info.
       render: shell
   - type: checkboxes
     id: checks
