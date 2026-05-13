@@ -6,6 +6,37 @@ El usuario solo debe entregar `<REPO_URL_PRIVADO>` y, si fuera necesario, autori
 
 ---
 
+## 0. Pre-requisito: tener un repo privado en GitHub
+
+Antes de cualquier paso tecnico el usuario necesita un repo privado vacio (o con el vault ya dentro). Es la unica accion fuera del agente. Si el usuario NO tiene repo, el agente debe ofrecer las dos opciones siguientes y esperar la URL.
+
+### 0.A Crear desde la UI de GitHub (camino manual)
+
+1. Ir a `https://github.com/new`.
+2. `Repository name`: `cursor-memory-vault`.
+3. `Visibility`: `Private`.
+4. NO inicializar con README, .gitignore ni license (se crea vacio).
+5. Click `Create repository`.
+6. Copiar la URL HTTPS (ejemplo `https://github.com/<usuario>/cursor-memory-vault.git`) y entregarla como `<REPO_URL_PRIVADO>`.
+
+### 0.B Crear con GitHub CLI (camino automatizado)
+
+Si `gh` esta instalado y autenticado:
+
+```powershell
+gh repo create cursor-memory-vault --private --confirm
+```
+
+Devuelve la URL automaticamente.
+
+Si `gh` no esta instalado, sugerir: `winget install --id GitHub.cli`. Luego `gh auth login`.
+
+### 0.C Si el usuario ya tiene el vault en otra maquina
+
+Solo dar la URL del repo existente. El agente clonara y continuara.
+
+---
+
 ## 1. Rol y mision
 
 Actua como ingeniero senior de automatizacion y SRE local en Windows.
@@ -78,7 +109,7 @@ Rutas y puertos canonicos:
 2. El server MCP corre como proceso aparte, no dentro del proceso de Cursor. Asi el watchdog puede vigilarlo y relanzarlo.
 3. Tareas programadas se ejecutan via `wscript.exe //B //nologo <runner>.vbs`, no via `powershell.exe` directo. Si se invoca PowerShell directo, aparece una ventana de consola visible cada vez que la tarea corre.
 4. En `Sync-Memory.ps1` el orden es: `git add -A` -> commit (si hay cambios) -> `git pull --rebase` -> `git push`. Si se hace `pull --rebase` con cambios sin stagear, falla con "cannot pull with rebase: You have unstaged changes".
-5. No se usa `ConvertFrom-Json -AsHashtable` porque puede no existir en PowerShell viejo. Se usa `ConvertFrom-Json` + `[pscustomobject]`.
+5. No se usa `ConvertFrom-Json -AsHashtable` porque puede no existir en PowerShell viejo. Se usa `ConvertFrom-Json` + `[ordered]@{}` para fusionar y `[pscustomobject]` solo al serializar al final. Acceder a propiedades de `pscustomobject` vacios con StrictMode + `-Version Latest` puede romper; iterar con `.PSObject.Properties` es seguro.
 6. PowerShell viejo no soporta `&&` ni `||` como separadores. No usar. Encadenar con `;` y verificar `$?` o `$LASTEXITCODE`.
 7. Health del MCP a veces tarda 6-15 segundos en responder despues del inicio. El script `Ensure-ObsidianMCP.ps1` reintenta hasta ~30 segundos.
 8. `EveryMinutes` de auto-sync minimo razonable: 5. Por defecto 10.
@@ -102,12 +133,31 @@ Rutas y puertos canonicos:
 
 Ejecuta cada paso en orden. No saltes ninguno.
 
+### 6.0 Kickoff (primera accion al recibir este prompt)
+
+1. Saluda en una linea.
+2. Si `<REPO_URL_PRIVADO>` aun esta como placeholder literal en el mensaje del usuario, NO arranques: pide solo dos cosas en formato bullet:
+   - `URL del repo privado` (si no existe, ofrecer pasos de seccion 0).
+   - `confirmacion de que el SO es Windows`.
+3. Si el usuario pega la URL y confirma OS, comienza con 6.1 sin volver a preguntar nada que ya este en este prompt.
+4. Reporta progreso compacto al terminar cada subseccion (6.1 OK, 6.2 OK, etc.).
+5. No imprimas todo el prompt de vuelta. Solo el delta y validaciones.
+
 ### 6.1 Preflight
 
-- verificar `git`, `node`, `npm` en PATH.
-- verificar conectividad a `<REPO_URL_PRIVADO>` (intentar `git ls-remote`).
-- verificar PowerShell disponible.
-- si falta algo critico, reporta y detente con instruccion clara.
+Ejecutar en este orden y, ante cualquier falla, ofrecer el fix exacto antes de detenerse.
+
+1. **Sistema operativo.** Verificar Windows. Si no es Windows, detente con: "Este flujo es Windows-first. Para Mac/Linux, sustituir Task Scheduler por cron/launchd y wscript+vbs por nohup/launchctl."
+2. **PowerShell.** Verificar version >= 5.1 (`$PSVersionTable.PSVersion`).
+3. **Git.** Si falta, sugerir: `winget install --id Git.Git`.
+4. **Node + npm.** Si falta, sugerir: `winget install --id OpenJS.NodeJS.LTS`.
+5. **GitHub CLI (opcional).** Si va a crear repo via 0.B y no esta, sugerir: `winget install --id GitHub.cli`.
+6. **Git identity.** Verificar `git config --global user.name` y `git config --global user.email`. Si faltan, pedirlos al usuario y configurarlos antes de cualquier commit.
+7. **Acceso real al repo privado.** Probar `git ls-remote <REPO_URL_PRIVADO>`.
+   - Si pide credenciales y no responde, el usuario no tiene Git Credential Manager configurado: sugerir reinstalar Git for Windows con la opcion "Git Credential Manager" o usar `gh auth login` para que `gh` configure las credenciales.
+   - Si devuelve `Repository not found` o `403`, el repo no existe o el usuario no tiene acceso: volver a paso 0.
+   - Si devuelve refs (aunque vacio), continuar.
+8. **Politica de ejecucion PowerShell.** Si una GPO bloquea `Bypass`, sugerir `Set-ExecutionPolicy -Scope CurrentUser RemoteSigned` y avisar que algunas tareas necesitaran `-ExecutionPolicy RemoteSigned`.
 
 ### 6.2 Vault local
 
@@ -126,7 +176,7 @@ Crea solo si no existen:
 
 ### 6.4 mcp.json (configuracion Cursor)
 
-Escribir `%USERPROFILE%\.cursor\mcp.json` exactamente con esta forma (no agregar otros servidores si ya existen, fusionar):
+**Fusionar, no sobreescribir.** Si el archivo ya existe con otros MCP servers (Linear, Supabase, etc.), preservarlos y solo agregar/actualizar la entrada `obsidian-memory`. Hacer backup `.bak` antes de modificar. La forma final del bloque a inyectar es:
 
 ```json
 {
@@ -276,15 +326,51 @@ if ($sourceDir -and ((Resolve-Path $sourceDir).Path -ne (Resolve-Path $targetDir
 }
 
 Ensure-Directory -Path (Split-Path -Path $CursorMcpPath -Parent)
-$mcpConfig = [pscustomobject]@{
-    mcpServers = [pscustomobject]@{
-        "obsidian-memory" = [pscustomobject]@{
-            command = "npx"
-            args    = @("-y", "mcp-remote", "http://127.0.0.1:$Port/sse")
+
+# IMPORTANTE: fusionar, no sobreescribir. Si el usuario ya tiene
+# otros MCP servers configurados (Linear, Supabase, etc.) los preservamos.
+# Usamos hashtables internamente para ser robustos con StrictMode y
+# objetos JSON vacios o malformados.
+$obsidianEntry = [ordered]@{
+    command = "npx"
+    args    = @("-y", "mcp-remote", "http://127.0.0.1:$Port/sse")
+}
+
+$rootHash = [ordered]@{}
+$mcpHash = [ordered]@{}
+
+if (Test-Path -LiteralPath $CursorMcpPath) {
+    Copy-Item -Path $CursorMcpPath -Destination "$CursorMcpPath.bak" -Force
+    $existing = $null
+    try {
+        $raw = Get-Content -Path $CursorMcpPath -Raw
+        if (-not [string]::IsNullOrWhiteSpace($raw)) {
+            $existing = $raw | ConvertFrom-Json -ErrorAction Stop
+        }
+    } catch {
+        $existing = $null
+    }
+    if ($null -ne $existing) {
+        foreach ($prop in $existing.PSObject.Properties) {
+            if ($prop.Name -ne 'mcpServers') {
+                $rootHash[$prop.Name] = $prop.Value
+            }
+        }
+        if ($existing.PSObject.Properties['mcpServers'] -and $null -ne $existing.mcpServers) {
+            foreach ($srv in $existing.mcpServers.PSObject.Properties) {
+                if ($srv.Name -ne 'obsidian-memory') {
+                    $mcpHash[$srv.Name] = $srv.Value
+                }
+            }
         }
     }
 }
-Set-Content -Path $CursorMcpPath -Value ($mcpConfig | ConvertTo-Json -Depth 20) -Encoding UTF8
+
+$mcpHash['obsidian-memory'] = $obsidianEntry
+$rootHash['mcpServers'] = $mcpHash
+
+$finalJson = [pscustomobject]$rootHash | ConvertTo-Json -Depth 20
+Set-Content -Path $CursorMcpPath -Value $finalJson -Encoding UTF8
 
 powershell -ExecutionPolicy Bypass -File (Join-Path $VaultPath "scripts\windows\Enable-MCP-Watchdog.ps1") -VaultPath $VaultPath -Port $Port
 powershell -ExecutionPolicy Bypass -File (Join-Path $VaultPath "scripts\windows\Enable-AutoSync.ps1") -VaultPath $VaultPath -EveryMinutes 10
@@ -655,6 +741,12 @@ Criterios de exito:
 | Cursor: MCP no disponible | `mcp.json` invoca el server SSE como STDIO | usar `npx -y mcp-remote http://127.0.0.1:3001/sse`. |
 | Health no responde justo despues de iniciar | server tarda en abrir puerto | reintentar hasta ~30s antes de fallar. |
 | `No se pudo crear la tarea programada` | quoting de `schtasks` con paths con espacios | envolver con `"` y usar `cmd /c "schtasks ... "`. |
+| `mcp.json` perdio otros servers (Linear, Supabase, etc.) | setup sobreescribio el archivo | restaurar `.bak` y usar el bloque de fusion de seccion 8.1. |
+| `git ls-remote` cuelga pidiendo credenciales | no hay Git Credential Manager | reinstalar Git for Windows con GCM, o `gh auth login`. |
+| `Repository not found` al hacer ls-remote | repo no creado o usuario sin acceso | volver a seccion 0 y crear/invitar al usuario. |
+| `git commit` falla con "Author identity unknown" | falta `git config --global user.email/name` | configurarlos antes de cualquier commit. |
+| Cursor lista `obsidian-memory` en rojo despues de reiniciar | `mcp-remote` aun no conecto al server | correr `Ensure-ObsidianMCP.ps1` y refrescar la lista MCP en Cursor. |
+| `npx -y mcp-remote` tarda mucho la primera vez | cache npx vacia | esperar ~30s la primera ejecucion, luego es instantaneo. |
 
 ---
 
@@ -672,12 +764,19 @@ Estructura obligatoria:
 3. Scripts entregados y cuando usar cada uno (tabla de seccion 8.8).
 4. User Rules generadas (bloque de seccion 9, listo para pegar).
 5. Validaciones ejecutadas con resultados (output literal de Doctor.ps1, health, schtasks /Query, sync manual).
-6. Pasos manuales restantes para el usuario:
-   - reiniciar Cursor;
-   - pegar las User Rules;
-   - probar dos prompts de verificacion en chat:
-     - `Usa obsidian-memory y lee MEMORY.md`;
-     - `Agrega una linea de prueba en SESSION_LOG.md`.
+6. Pasos manuales restantes para el usuario (en este orden):
+   1. **reiniciar Cursor** (cerrar todas las ventanas, volver a abrir);
+   2. **pegar las User Rules** en `Cursor Settings -> Rules -> User Rules -> Save`;
+   3. **smoke test desde la UI de Cursor**:
+      - abrir `Cursor Settings -> MCP & Integrations` (o `MCP`);
+      - confirmar que `obsidian-memory` aparece listado y con indicador verde / "connected" / numero de tools > 0;
+      - si aparece rojo / "no disponible": el agente debe correr `Ensure-ObsidianMCP.ps1` y pedirle al usuario que recargue la lista de MCP en Cursor.
+   4. **smoke test desde el chat** de Cursor con dos prompts:
+      - `Usa obsidian-memory y lee MEMORY.md`;
+      - `Agrega una linea de prueba en SESSION_LOG.md y haz sync.`
+   5. confirmar en GitHub que aparezca el commit del paso anterior.
+
+Si los 5 pasos pasan, la instalacion esta completa.
 
 ---
 
