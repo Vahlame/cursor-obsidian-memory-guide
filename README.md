@@ -7,6 +7,13 @@
 
 > Idiomas: **Español** | [English](./README.en.md)
 
+## Instalación rápida
+
+> **¿Quieres que el agente configure todo por ti?**
+> Pega el contenido de [`INSTALAR_MEMORIA.md`](./INSTALAR_MEMORIA.md) en un chat nuevo de Cursor y el agente ejecutará cada paso: prerrequisitos, vault, MCP, User Rules, verificación.
+>
+> — English: [`INSTALAR_MEMORIA.en.md`](./INSTALAR_MEMORIA.en.md)
+
 ## Tu camino (orden recomendado)
 
 > **Migración de modelo (v2 → v3, todo en `main`):** el kit **ya no incluye** scripts Windows en `scripts/windows/` ni `tools/*.ps1` para integración; el capítulo y la tabla de sustitución están en [`docs/migration/v2-to-v3-script-free-kit.md`](./docs/migration/v2-to-v3-script-free-kit.md).
@@ -20,7 +27,9 @@
 7. **Git del vault (opcional):** [`docs/setup/windows-scheduled-vault-sync.md`](./docs/setup/windows-scheduled-vault-sync.md) (`obsidian-memoryd` o git manual).
 8. **Sin automatismos extra en tu PC:** memoria en el mismo repo que ya actualizas con git — [`docs/setup/memory-repo-sin-automatismos-locales.md`](./docs/setup/memory-repo-sin-automatismos-locales.md).
 9. **Windows: sin ventanas CMD / tirones (workspace + tareas + juego):** [`docs/setup/windows-sin-consola-visible.md`](./docs/setup/windows-sin-consola-visible.md) · [`docs/setup/windows-juego-vault-sync.md`](./docs/setup/windows-juego-vault-sync.md).
-10. **Vault ya creado:** vuelve a ejecutar `npx @vahlame/create-obsidian-memory@next -- --non-interactive --vault "RUTA"` para **fusionar** en el vault el `.vscode/settings.json` calmado (no borra tus claves extra).
+10. **Vault ya creado:** vuelve a ejecutar el inicializador para **fusionar** config sin perder claves:
+    - Solo `basic-memory`: `npx @vahlame/create-obsidian-memory@next -- --non-interactive --vault "RUTA"`
+    - Con híbrido FTS: `node packages/create-obsidian-memory/dist/index.js --non-interactive --vault "RUTA" --with-hybrid --repo-root "RUTA_DEL_CLON"` (desde el clon del repo; instala antes `pip install -e packages/obsidian-memory-rag`).
 
 ## Qué es este repo (una viñeta)
 
