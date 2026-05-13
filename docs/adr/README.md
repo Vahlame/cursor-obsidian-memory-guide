@@ -13,6 +13,12 @@ Each file in this directory captures one design decision: what was chosen, what 
 | [ADR-0007](./0007-windows-first-pattern.md) | Windows-first; other platforms via separate prompt variants | Accepted |
 | [ADR-0008](./0008-vault-doctor-as-canonical-tool.md) | Ship `Vault-Doctor.ps1` as the canonical vault health audit alongside `Doctor.ps1` | Accepted |
 | [ADR-0009](./0009-frontmatter-and-three-level-reading-flow.md) | Default vault layout with YAML frontmatter and a three-level agent reading flow | Accepted |
+| [ADR-0010](./0010-migrate-to-basic-memory.md) | Migrate MCP stack to `basic-memory` (Streamable HTTP) | Accepted |
+| [ADR-0011](./0011-adopt-agents-md.md) | `AGENTS.md` as canonical agent surface (IDE-agnostic) | Accepted |
+| [ADR-0012](./0012-go-daemon-cross-platform.md) | Cross-platform Go daemon (`obsidian-memoryd`) replaces PowerShell + Task Scheduler | Accepted |
+| [ADR-0013](./0013-syncthing-as-transport.md) | Syncthing as an optional sync transport | Accepted |
+| [ADR-0014](./0014-hybrid-retrieval-sqlite-vec.md) | Hybrid retrieval (FTS5 + sqlite-vec) as optional RAG sidecar | Accepted |
+| [ADR-0015](./0015-ley-8968-compliance.md) | Document Ley 8968 compliance posture for education-adjacent deployments | Accepted |
 
 ## Template
 
