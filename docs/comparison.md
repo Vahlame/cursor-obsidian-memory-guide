@@ -2,18 +2,18 @@
 
 Honest positioning for **v2** (cross-platform, `basic-memory`, optional Go daemon + hybrid RAG). Opinionated one-liners; follow links for nuance.
 
-| Feature                         | v2 pattern (this repo)                  | Cursor built-in memory | mem0                     | Letta / MemGPT             | Custom RAG (pgvector / Qdrant) |
-| ------------------------------- | --------------------------------------- | ---------------------- | ------------------------ | -------------------------- | ------------------------------ |
-| Storage ownership               | Markdown in **your** git repo           | Cursor cloud           | SaaS or self-host        | Self-host server           | Your DB                        |
-| IDE lock-in                     | Low (`AGENTS.md` + MCP)                 | High                   | Low                      | Medium                     | Low                            |
-| Transport                       | MCP Streamable HTTP (`basic-memory`)    | proprietary            | HTTP SDK                 | HTTP / WS                  | SQL / gRPC                     |
-| Offline-friendly                | Local vault reads yes                   | varies                 | usually no               | if self-host               | if self-host                   |
-| Sync story                      | git (+ optional Syncthing)              | account sync           | service                  | server backup              | replication                    |
+| Feature                         | v2 pattern (this repo)                                 | Cursor built-in memory | mem0                     | Letta / MemGPT             | Custom RAG (pgvector / Qdrant) |
+| ------------------------------- | ------------------------------------------------------ | ---------------------- | ------------------------ | -------------------------- | ------------------------------ |
+| Storage ownership               | Markdown in **your** git repo                          | Cursor cloud           | SaaS or self-host        | Self-host server           | Your DB                        |
+| IDE lock-in                     | Low (`AGENTS.md` + MCP)                                | High                   | Low                      | Medium                     | Low                            |
+| Transport                       | MCP Streamable HTTP (`basic-memory`)                   | proprietary            | HTTP SDK                 | HTTP / WS                  | SQL / gRPC                     |
+| Offline-friendly                | Local vault reads yes                                  | varies                 | usually no               | if self-host               | if self-host                   |
+| Sync story                      | git (+ optional Syncthing)                             | account sync           | service                  | server backup              | replication                    |
 | Retrieval latency at huge scale | optional **FTS5** sidecar + sqlite-vec path (ADR-0014) | opaque                 | service tuned            | strong                     | strongest                      |
-| Setup time                      | minutes (`uvx` + config)                | zero                   | account + SDK            | server                     | schema + indexer               |
-| Compliance hooks                | docs + optional age + OTel redaction    | opaque                 | vendor docs              | your policy                | your policy                    |
-| Best at                         | Human-editable durable notes for agents | quick ephemeral prefs  | app-embedded user memory | agent runtime memory tiers | huge corpora                   |
-| Worst at                        | Not a billion-row warehouse             | portability / audit    | markdown-first editing   | ops complexity             | free-form note UX              |
+| Setup time                      | minutes (`uvx` + config)                               | zero                   | account + SDK            | server                     | schema + indexer               |
+| Compliance hooks                | docs + optional age + OTel redaction                   | opaque                 | vendor docs              | your policy                | your policy                    |
+| Best at                         | Human-editable durable notes for agents                | quick ephemeral prefs  | app-embedded user memory | agent runtime memory tiers | huge corpora                   |
+| Worst at                        | Not a billion-row warehouse                            | portability / audit    | markdown-first editing   | ops complexity             | free-form note UX              |
 
 ## When to pick v2 here
 

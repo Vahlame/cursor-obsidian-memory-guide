@@ -33,6 +33,10 @@ pwsh -File .github/scripts/extract-and-lint.ps1
 
 # Go tests (requires Go 1.22+)
 go test ./...
+
+# Python RAG tests
+pip install -e ./packages/obsidian-memory-rag
+pytest packages/obsidian-memory-rag/tests
 ```
 
 All must pass. CI mirrors these in `.github/workflows/ci.yml`.

@@ -19,7 +19,7 @@ Los modelos no recuerdan entre sesiones. Externalizar memoria en **Markdown vers
 4. (Opcional) `go build -o obsidian-memoryd ./cmd/obsidian-memoryd` y `obsidian-memoryd watch`.
 5. (Opcional, bóvedas grandes) `pip install -e ./packages/obsidian-memory-rag` y `obsidian-memory-rag index --vault <ruta>` para búsqueda **FTS5** local (`search` / `bench`).
 
-Flujo guiado completo: `npx @vahlame/create-obsidian-memory@next` (beta publicada con tag `next`).
+Flujo guiado: `npx @vahlame/create-obsidian-memory@next` (fusiona **`basic-memory`** en `~/.cursor/mcp.json` de Cursor si lo eliges; usa `--dry-run` para ver el JSON sin escribir).
 
 ## Cómo funciona
 
@@ -78,7 +78,9 @@ Ver [`docs/comparison.md`](./docs/comparison.md).
 
 ## Migración desde v1
 
-- Prompt histórico: `docs/legacy/PROMPT_ULTRA_COMPLETO_v1.md`.
+- Cierre objetivos v1 → piezas v2: [`docs/migration/v1-prompt-closure.md`](./docs/migration/v1-prompt-closure.md).
+- Prompt histórico (Windows): `docs/legacy/PROMPT_ULTRA_COMPLETO_v1.md`.
+- Atajos Linux / macOS (redirección a v2): [`PROMPT_ULTRA_COMPLETO.linux.md`](./PROMPT_ULTRA_COMPLETO.linux.md), [`PROMPT_ULTRA_COMPLETO.macos.md`](./PROMPT_ULTRA_COMPLETO.macos.md).
 - Tabla de herramientas MCP: `docs/migration/v1-to-v2-mcp.md`.
 - Scripts Windows v1: `docs/legacy/windows-v1/README.md`.
 

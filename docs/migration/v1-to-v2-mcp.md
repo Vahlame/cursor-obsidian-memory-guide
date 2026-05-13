@@ -22,7 +22,11 @@ v1 used the Node package `@smith-and-web/obsidian-mcp-server` with **SSE** on `h
 ## New / emphasized in v2
 
 - **`build_context`** and **`recent_activity`** as first-class “agent context” helpers.
-- Optional **hybrid retrieval** (`vault_hybrid_search`) via `packages/obsidian-memory-mcp` / `packages/obsidian-memory-rag` (see ADR-0014).
+- Optional **local lexical retrieval**: CLI **`obsidian-memory-rag`** (`index` / `search` / `bench`, SQLite FTS5). A dedicated MCP tool for hybrid search may be added later; today agents call the CLI or rely on `basic-memory` `search_notes`.
+
+## v1 “final checklist” vs v2
+
+See **`docs/migration/v1-prompt-closure.md`** for how the old Windows ultra-prompt deliverables map to v2 tooling in this public repo.
 
 ## Validation
 

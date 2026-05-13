@@ -16,12 +16,15 @@ v2 is **cross-platform** (Windows/Linux/macOS) and **IDE-agnostic**. Canonical a
 4. Optional: build `obsidian-memoryd` (`go build ./cmd/obsidian-memoryd`) for debounced git sync.
 5. Optional (large vaults): `pip install -e ./packages/obsidian-memory-rag` then `obsidian-memory-rag index --vault <path>` for local **FTS5** search (`search` / `bench`).
 
-Guided flow: `npx @vahlame/create-obsidian-memory@next`.
+Guided flow: `npx @vahlame/create-obsidian-memory@next` (merges **`basic-memory`** into Cursor `~/.cursor/mcp.json` when selected; use `--dry-run` to preview).
 
 ## Migration from v1
 
-- Archived prompt: `docs/legacy/PROMPT_ULTRA_COMPLETO_v1.md`
-- Tool mapping: `docs/migration/v1-to-v2-mcp.md`
+- v1 checklist → v2 tooling: [`docs/migration/v1-prompt-closure.md`](./docs/migration/v1-prompt-closure.md).
+- Archived Windows ultra-prompt: `docs/legacy/PROMPT_ULTRA_COMPLETO_v1.md`.
+- Linux / macOS stubs (point to v2): [`PROMPT_ULTRA_COMPLETO.linux.md`](./PROMPT_ULTRA_COMPLETO.linux.md), [`PROMPT_ULTRA_COMPLETO.macos.md`](./PROMPT_ULTRA_COMPLETO.macos.md).
+- MCP tool mapping: `docs/migration/v1-to-v2-mcp.md`.
+- Legacy Windows-only scripts: `docs/legacy/windows-v1/README.md`.
 
 ## Docs
 
