@@ -35,7 +35,7 @@ Reglas de implementacion:
    - pasos manuales restantes.
 
 Reglas de memoria durante trabajo:
-- Al iniciar tarea: leer `MEMORY.md` y `PROJECTS/<proyecto>.md`.
+- Al iniciar tarea: leer `MEMORY.md` y `PROJECTS/NOMBRE_PROYECTO.md`.
 - Durante tarea: guardar checkpoint cada 3-5 mensajes si hubo avance real.
 - Al cerrar tarea: resumen breve en `SESSION_LOG.md`.
 - Solo lo durable/global va a `MEMORY.md`.
