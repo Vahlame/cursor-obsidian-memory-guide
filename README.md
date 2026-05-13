@@ -109,13 +109,16 @@ Si quieres ver el contenido literal de los scripts (PowerShell, CMD, VBS), está
 
 ## Estructura del repo
 
-```
-.
-├── README.md                  # esta guía
-└── PROMPT_ULTRA_COMPLETO.md   # brief operativo para el agente de Cursor
-```
+| Archivo | Para qué | Audiencia |
+|---|---|---|
+| [`README.md`](./README.md) | Esta guía. Onboarding humano de 30 minutos. | Humano |
+| [`PROMPT_ULTRA_COMPLETO.md`](./PROMPT_ULTRA_COMPLETO.md) | Brief operativo. Lo pegas en chat de Cursor y el agente hace todo. | Agente IA |
+| [`AGENTS.md`](./AGENTS.md) | Mapa machine-readable del repo para agentes IA que lo descubren. | Agente IA |
+| [`manifest.json`](./manifest.json) | Mismo mapa pero en JSON, para indexado/scraping. | Programático |
+| [`LICENSE`](./LICENSE) | MIT. | Legal |
+| `.gitattributes` | Normaliza line endings. | Git |
 
-Intencionalmente minimalista. Nada que mantener salvo el prompt y la documentación.
+Intencionalmente minimalista. Cero scripts: el agente los genera en tu PC siguiendo el prompt.
 
 ---
 
