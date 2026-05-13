@@ -1,137 +1,145 @@
-# Cursor Memory in 30 Minutes (Windows)
+# Cursor Memory with Obsidian MCP
 
-Este repo queda intencionalmente minimalista: solo lo necesario para integrar memoria persistente en Cursor con Obsidian MCP + GitHub.
+Un patrón simple para darle a Cursor memoria persistente, organizada y compartida entre dispositivos, usando Obsidian MCP y un repo privado de GitHub.
 
-## TL;DR (1 pantalla)
+> Este repo solo contiene **el prompt** y **la guía**. No incluye scripts: el agente de Cursor los genera localmente en tu PC siguiendo el prompt, porque cada instalación es distinta y conviene que cada quien tenga los suyos.
 
-1. Crea un repo privado para `cursor-memory-vault`.
-2. Abre chat en Cursor y pega `PROMPT_ULTRA_COMPLETO.md`.
-3. Reemplaza `<REPO_URL_PRIVADO>`.
-4. Deja que el agente configure todo.
-5. Reinicia Cursor.
-6. Verifica:
+---
 
-```powershell
-powershell -ExecutionPolicy Bypass -File ".\scripts\windows\Doctor.ps1"
-```
+## TL;DR
 
-Si sale en verde, ya quedó.
-
-## Que hace
-
-- conecta Cursor a `obsidian-memory` via `mcp-remote`;
-- levanta/revive el servidor MCP local automaticamente;
-- sincroniza tu vault a GitHub cada 10 minutos;
-- deja memoria global y por proyecto en Markdown.
-
-## Tiempo estimado
-
-Si ya tienes Git + Node + Cursor, se hace en **30 minutos o menos**.
-
-## Por que funciona
-
-Los modelos no guardan memoria infinita entre sesiones.  
-Este sistema mueve la memoria a archivos Markdown versionados en Git:
-
-- `MEMORY.md`: reglas/preferencias globales;
-- `SESSION_LOG.md`: bitacora de decisiones;
-- `PROJECTS/*.md`: contexto por proyecto.
-
-Cursor consulta/actualiza esos archivos via MCP, y GitHub los replica entre dispositivos.
-
-## Unico flujo recomendado (IA hace el trabajo pesado)
-
-1. Crea un repo privado para tu vault (ejemplo: `cursor-memory-vault`).
+1. Crea un repo privado para tu vault (ejemplo `cursor-memory-vault`).
 2. Abre un chat nuevo en Cursor.
-3. Pega el contenido de `PROMPT_ULTRA_COMPLETO.md`.
-4. Reemplaza solo `<REPO_URL_PRIVADO>` por tu URL.
-5. Deja que el agente ejecute todo (setup, watchdog, autosync, validaciones).
+3. Pega el contenido de [`PROMPT_ULTRA_COMPLETO.md`](./PROMPT_ULTRA_COMPLETO.md).
+4. Reemplaza `<REPO_URL_PRIVADO>` por la URL de tu repo.
+5. Deja que el agente haga el resto.
 6. Reinicia Cursor cuando te lo indique.
 
-El usuario solo da 2 cosas:
-- la URL del repo privado;
-- confirmaciones puntuales si el sistema pide permisos.
+Tiempo estimado si ya tienes Git, Node y Cursor: **30 minutos o menos**.
 
-## Flujo de instalacion (una sola vez por equipo)
+---
 
-1. Usuario crea repo privado del vault.
-2. Usuario pega `PROMPT_ULTRA_COMPLETO.md` en un chat de Cursor.
-3. El agente:
-   - clona/actualiza vault local,
-   - configura `%USERPROFILE%\.cursor\mcp.json`,
-   - activa watchdog MCP (cada 5 min),
-   - activa auto-sync git (cada 10 min),
-   - corre diagnóstico final.
-4. Usuario reinicia Cursor.
+## Por qué existe esto
 
-## Flujo diario (ya operativo)
+Los modelos no recuerdan entre sesiones. Lo que parece "memoria" es prompt + reglas + retrieval.
 
-1. Cursor usa `obsidian-memory` para leer contexto del vault.
-2. El agente escribe checkpoints y cierres de tarea en Markdown.
-3. `CursorMemoryAutoSync` hace push automático a GitHub.
-4. En otra máquina, el mismo setup recupera esa memoria.
+La forma sencilla y portable de tener algo cercano a memoria persistente es externalizarla en archivos Markdown versionados, y dejar que Cursor los lea/escriba a través de un servidor MCP.
 
-## Scripts (los usa el agente automaticamente)
+| Archivo | Para qué |
+|---|---|
+| `MEMORY.md` | Reglas y preferencias globales duraderas. |
+| `SESSION_LOG.md` | Bitácora cronológica de decisiones. |
+| `PROJECTS/<proyecto>.md` | Contexto y decisiones por proyecto. |
 
-- `scripts/windows/Setup-Cursor-Memory.cmd`
- - Opcion manual de respaldo si no quieres usar el prompt.
-- `scripts/windows/Setup-Cursor-Memory.ps1`
-  - Setup completo por consola o automatización.
-- `scripts/windows/Sync-Memory.ps1`
-  - Forzar sync inmediato (sin esperar 10 minutos).
-- `scripts/windows/Ensure-ObsidianMCP.ps1`
-  - Levanta MCP si está caído.
-- `scripts/windows/Enable-MCP-Watchdog.ps1`
-  - Crea/repara watchdog cada 5 minutos.
-- `scripts/windows/Enable-AutoSync.ps1`
-  - Crea/repara auto-sync cada 10 minutos.
-- `scripts/windows/Doctor.ps1`
-  - Diagnóstico rápido end-to-end.
+GitHub se encarga de replicar esto entre tus dispositivos.
 
-## Como funciona internamente
+---
 
-1. Cursor lee `%USERPROFILE%\.cursor\mcp.json`.
-2. Ahí se registra `obsidian-memory` usando `mcp-remote`.
-3. `mcp-remote` apunta a `http://127.0.0.1:3001/sse`.
-4. El servidor Obsidian MCP lee/escribe tu vault en disco.
-5. Scheduler:
-   - `CursorObsidianMcpWatchdog` mantiene MCP arriba.
-   - `CursorMemoryAutoSync` sincroniza git automáticamente.
-
-## Mapa de flujo (comunicación)
+## Arquitectura
 
 ```mermaid
 flowchart LR
     U[Usuario] --> C[Cursor Chat]
-    C --> M[mcp-remote]
-    M --> S[Obsidian MCP Server :3001 /sse]
+    C --> M[mcp-remote npx]
+    M --> S[Obsidian MCP Server :3001 sse]
     S --> V[Vault Markdown local]
     V --> G[Git local]
     G --> R[GitHub repo privado]
-    W[Task: MCP Watchdog 5m] --> S
-    A[Task: AutoSync 10m] --> G
+    W[Task Watchdog 5 min] --> S
+    A[Task AutoSync 10 min] --> G
 ```
 
-Lectura/escritura de memoria:
-- Cursor pide contexto -> MCP -> vault.
-- Agente guarda cambios -> vault -> git -> GitHub.
+Componentes clave:
 
-## Alcance del repo (sin extras)
+- **Cliente**: Cursor Chat.
+- **Puente**: `npx -y mcp-remote http://127.0.0.1:3001/sse` (transforma STDIO en SSE).
+- **Servidor MCP**: paquete `@smith-and-web/obsidian-mcp-server` corriendo en `:3001`.
+- **Storage**: vault Markdown en disco.
+- **Sync**: git + GitHub privado.
+- **Resiliencia**: dos tareas de Windows Task Scheduler (watchdog + auto-sync).
 
-Este repo solo mantiene:
-- prompt ultra completo para que el agente haga el trabajo pesado;
-- scripts Windows necesarios para setup, operación y diagnóstico;
-- explicación breve de flujo y funcionamiento.
+---
 
-## Verificación rápida
+## Cómo se usa el prompt
 
-```powershell
-powershell -ExecutionPolicy Bypass -File ".\scripts\windows\Doctor.ps1"
-```
+El prompt en este repo está pensado para que el **agente de Cursor haga el trabajo pesado por ti** en tu propia máquina. Eso incluye:
 
-En Cursor, prueba:
+- crear los scripts PowerShell que necesite tu PC;
+- generar `mcp.json` con la configuración correcta;
+- registrar las tareas programadas en modo oculto;
+- generar las User Rules listas para pegar;
+- validar que todo quede funcionando end-to-end.
+
+El usuario solo aporta:
+
+- la URL del repo privado del vault;
+- autorizaciones puntuales si el sistema las pide.
+
+---
+
+## Verificación rápida (la hace el agente)
+
+El propio prompt obliga al agente a:
+
+- correr un health check al endpoint MCP local;
+- consultar las tareas programadas;
+- ejecutar un sync manual de prueba;
+- entregarte un reporte estructurado al final.
+
+Tras reiniciar Cursor puedes probar manualmente:
 
 - `Usa obsidian-memory y lee MEMORY.md`
 - `Agrega una linea de prueba en SESSION_LOG.md`
 
-Si eso funciona, ya quedó.
+Si responde correctamente, ya quedó funcional.
+
+---
+
+## Por qué no hay scripts en este repo
+
+Cada instalación tiene rutas, usuarios, permisos y versiones distintas. En la práctica:
+
+- los scripts conviene que vivan **dentro de tu vault privado**, no en este repo público;
+- el agente sabe generarlos correctamente con el contexto y los gotchas reales del prompt;
+- así evitas mantener scripts genéricos que pueden romperse en otra máquina.
+
+Si quieres ver el contenido literal de los scripts (PowerShell, CMD, VBS), está incluido directamente en [`PROMPT_ULTRA_COMPLETO.md`](./PROMPT_ULTRA_COMPLETO.md), sección 8.
+
+---
+
+## Estructura del repo
+
+```
+.
+├── README.md                  # esta guía
+└── PROMPT_ULTRA_COMPLETO.md   # brief operativo para el agente de Cursor
+```
+
+Intencionalmente minimalista. Nada que mantener salvo el prompt y la documentación.
+
+---
+
+## Sistemas operativos
+
+Este patrón está diseñado y probado en **Windows**. La idea es portable a Linux y macOS sustituyendo:
+
+- `Task Scheduler` por `cron` o `launchd`;
+- `wscript+vbs` por `nohup`/`launchctl`;
+- rutas `%USERPROFILE%` por `$HOME`.
+
+El prompt actual asume Windows. Si quieres otra plataforma, adáptalo o pídele al agente que lo traduzca.
+
+---
+
+## Seguridad
+
+- usa repositorios **privados** para tu vault;
+- nunca guardes secretos, tokens o credenciales en Markdown;
+- si compartes un token por error, **revócalo inmediatamente**;
+- mantén `2FA` activo en GitHub.
+
+---
+
+## Licencia
+
+MIT.

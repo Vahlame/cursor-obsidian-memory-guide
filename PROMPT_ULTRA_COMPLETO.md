@@ -19,10 +19,9 @@ Mision: dejar instalado, validado y operativo un sistema de memoria persistente 
 5. No requiera trabajo manual recurrente del usuario.
 6. Incluya scripts reutilizables y User Rules listas para Cursor.
 
-Trabajas con dos repos:
+Trabajas con un repo privado del usuario: `<REPO_URL_PRIVADO>` (vault de memoria, ejemplo `cursor-memory-vault`).
 
-- repo privado del usuario: `<REPO_URL_PRIVADO>` (vault de memoria, ejemplo `cursor-memory-vault`).
-- repo publico de guia (este): `https://github.com/Vahlame/cursor-obsidian-memory-guide` (de referencia).
+Los scripts y archivos los generas TU localmente en la maquina del usuario. No existe un repo publico que los provea: cada instalacion debe tener sus propios scripts dentro del vault.
 
 ---
 
@@ -144,11 +143,11 @@ Escribir `%USERPROFILE%\.cursor\mcp.json` exactamente con esta forma (no agregar
 }
 ```
 
-### 6.5 Generar/actualizar scripts en `scripts/windows/`
+### 6.5 Generar scripts locales en `<VAULT_PATH>\scripts\windows\`
 
-Crea cada script si no existe. Si existe, sobreescribir solo si difiere y dejar rastro.
+Crea cada script con el contenido literal de la seccion 8. Si ya existe uno, conservar el del usuario salvo que difiera de la version canonica; en ese caso, hacer backup `.bak` antes de sobreescribir.
 
-Lista exacta:
+Lista exacta a crear/actualizar:
 
 1. `Setup-Cursor-Memory.ps1`
 2. `Setup-Cursor-Memory.cmd`
@@ -158,7 +157,7 @@ Lista exacta:
 6. `Enable-AutoSync.ps1`
 7. `Doctor.ps1`
 
-Contenido literal en seccion 8.
+Estos scripts viven SOLO en el vault del usuario; no se buscan ni descargan de ningun repo externo.
 
 ### 6.6 Tareas programadas
 
@@ -202,9 +201,9 @@ Probar tambien un sync manual con `Sync-Memory.ps1` para verificar que git puede
 
 ---
 
-## 8. Scripts (contenido literal)
+## 8. Scripts (contenido literal a generar localmente)
 
-Escribe estos archivos exactamente como aparecen, en `<VAULT_PATH>\scripts\windows\` (y opcionalmente tambien en el repo de guia bajo el mismo path).
+Escribe estos archivos exactamente como aparecen, en `<VAULT_PATH>\scripts\windows\`. No los busques en repos externos: si no existen, los creas tu con este contenido.
 
 ### 8.1 `Setup-Cursor-Memory.ps1`
 
@@ -255,17 +254,25 @@ if (-not (Test-Path -LiteralPath $memory)) { Set-Content -Path $memory -Value "#
 if (-not (Test-Path -LiteralPath $session)) { Set-Content -Path $session -Value "# SESSION LOG" -Encoding UTF8 }
 if (-not (Test-Path -LiteralPath $template)) { Set-Content -Path $template -Value "# <proyecto>" -Encoding UTF8 }
 
+# Si setup se ejecuta desde fuera del vault, copiar los scripts al vault.
+# Si ya estan en el vault (mismo directorio), omitir la copia.
 $sourceDir = $PSScriptRoot
-$targets = @(
-    "Setup-Cursor-Memory.ps1",
-    "Sync-Memory.ps1",
-    "Enable-AutoSync.ps1",
-    "Ensure-ObsidianMCP.ps1",
-    "Enable-MCP-Watchdog.ps1",
-    "Doctor.ps1"
-)
-foreach ($file in $targets) {
-    Copy-Item -Path (Join-Path $sourceDir $file) -Destination (Join-Path $VaultPath "scripts\windows\$file") -Force
+$targetDir = Join-Path $VaultPath "scripts\windows"
+if ($sourceDir -and ((Resolve-Path $sourceDir).Path -ne (Resolve-Path $targetDir).Path)) {
+    $targets = @(
+        "Setup-Cursor-Memory.ps1",
+        "Sync-Memory.ps1",
+        "Enable-AutoSync.ps1",
+        "Ensure-ObsidianMCP.ps1",
+        "Enable-MCP-Watchdog.ps1",
+        "Doctor.ps1"
+    )
+    foreach ($file in $targets) {
+        $src = Join-Path $sourceDir $file
+        if (Test-Path -LiteralPath $src) {
+            Copy-Item -Path $src -Destination (Join-Path $targetDir $file) -Force
+        }
+    }
 }
 
 Ensure-Directory -Path (Split-Path -Path $CursorMcpPath -Parent)
