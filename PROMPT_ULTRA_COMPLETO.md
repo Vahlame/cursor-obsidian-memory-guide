@@ -115,6 +115,10 @@ Rutas y puertos canonicos:
 8. `EveryMinutes` de auto-sync minimo razonable: 5. Por defecto 10.
 9. Vault y mcp.json se manejan a nivel usuario (`%USERPROFILE%`), no global, para no requerir admin.
 10. Tareas se crean con `/RL LIMITED` para no requerir admin.
+11. El paquete `@smith-and-web/obsidian-mcp-server` se invoca con un range de version pineado (`@smith-and-web/obsidian-mcp-server@^0.1.0`) en lugar de `latest`. Asi una breaking change publicada arriba no rompe instalaciones existentes silenciosamente.
+12. Cada script con efectos persistentes (sync, watchdog) escribe un log rotatorio en `%LOCALAPPDATA%\cursor-memory\logs\` via `Start-Transcript`. Asi cuando una tarea programada falla el diagnostico es trivial.
+13. El sistema entrega un `Uninstall-Cursor-Memory.ps1` reversible: borra ambas tareas, restaura `mcp.json.bak` cuando existe, y NUNCA toca el vault. Confianza primero.
+14. El sistema entrega un `Repair.ps1` que reaplica 6.4 + 6.6 + 6.7 sin reclonar el vault. Util cuando el vault esta sano pero el resto de la instalacion drifteo.
 
 ---
 
@@ -206,6 +210,8 @@ Lista exacta a crear/actualizar:
 5. `Enable-MCP-Watchdog.ps1`
 6. `Enable-AutoSync.ps1`
 7. `Doctor.ps1`
+8. `Uninstall-Cursor-Memory.ps1`
+9. `Repair.ps1`
 
 Estos scripts viven SOLO en el vault del usuario; no se buscan ni descargan de ningun repo externo.
 
@@ -270,7 +276,7 @@ param(
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
-function Ensure-Directory {
+function Initialize-Directory {
     param([string]$Path)
     if (-not (Test-Path -LiteralPath $Path)) {
         New-Item -ItemType Directory -Path $Path | Out-Null
@@ -292,9 +298,9 @@ if (-not (Test-Path -LiteralPath $VaultPath)) {
     git -C $VaultPath pull --rebase origin $Branch
 }
 
-Ensure-Directory -Path (Join-Path $VaultPath "PROJECTS")
-Ensure-Directory -Path (Join-Path $VaultPath "SNIPPETS")
-Ensure-Directory -Path (Join-Path $VaultPath "scripts\windows")
+Initialize-Directory -Path (Join-Path $VaultPath "PROJECTS")
+Initialize-Directory -Path (Join-Path $VaultPath "SNIPPETS")
+Initialize-Directory -Path (Join-Path $VaultPath "scripts\windows")
 
 $memory = Join-Path $VaultPath "MEMORY.md"
 $session = Join-Path $VaultPath "SESSION_LOG.md"
@@ -325,7 +331,7 @@ if ($sourceDir -and ((Resolve-Path $sourceDir).Path -ne (Resolve-Path $targetDir
     }
 }
 
-Ensure-Directory -Path (Split-Path -Path $CursorMcpPath -Parent)
+Initialize-Directory -Path (Split-Path -Path $CursorMcpPath -Parent)
 
 # IMPORTANTE: fusionar, no sobreescribir. Si el usuario ya tiene
 # otros MCP servers configurados (Linear, Supabase, etc.) los preservamos.
@@ -434,13 +440,21 @@ Uso: alternativa de doble click si el usuario no quiere lanzar el `.ps1` a mano.
 param(
     [string]$VaultPath = "$HOME\Documents\cursor-memory-vault",
     [string]$Branch = "main",
-    [string]$Message = ""
+    [string]$Message = "",
+    [string]$LogDir = "$env:LOCALAPPDATA\cursor-memory\logs"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
 
+if (-not (Test-Path -LiteralPath $LogDir)) {
+    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+}
+$logFile = Join-Path $LogDir ("sync_{0}.log" -f (Get-Date -Format "yyyy-MM-dd"))
+Start-Transcript -Path $logFile -Append | Out-Null
+
 if (-not (Test-Path -LiteralPath (Join-Path $VaultPath ".git"))) {
+    Stop-Transcript | Out-Null
     throw "No hay repo Git en $VaultPath"
 }
 
@@ -461,6 +475,7 @@ git -C $VaultPath pull --rebase origin $Branch
 git -C $VaultPath push origin $Branch
 
 Write-Host "Sync completado."
+Stop-Transcript | Out-Null
 ```
 
 Uso: forzar sync manual sin esperar la tarea programada. Tambien lo invoca la tarea `CursorMemoryAutoSync`.
@@ -470,11 +485,19 @@ Uso: forzar sync manual sin esperar la tarea programada. Tambien lo invoca la ta
 ```powershell
 param(
     [string]$VaultPath = "$HOME\Documents\cursor-memory-vault",
-    [int]$Port = 3001
+    [int]$Port = 3001,
+    [string]$McpPackage = "@smith-and-web/obsidian-mcp-server@^0.1.0",
+    [string]$LogDir = "$env:LOCALAPPDATA\cursor-memory\logs"
 )
 
 Set-StrictMode -Version Latest
 $ErrorActionPreference = "Stop"
+
+if (-not (Test-Path -LiteralPath $LogDir)) {
+    New-Item -ItemType Directory -Path $LogDir -Force | Out-Null
+}
+$logFile = Join-Path $LogDir ("ensure-mcp_{0}.log" -f (Get-Date -Format "yyyy-MM-dd"))
+Start-Transcript -Path $logFile -Append | Out-Null
 
 function Test-Health {
     param([int]$HealthPort)
@@ -488,10 +511,11 @@ function Test-Health {
 
 if (Test-Health -HealthPort $Port) {
     Write-Host "MCP activo en puerto $Port."
+    Stop-Transcript | Out-Null
     exit 0
 }
 
-$startCmd = "`$env:VAULT_PATH='$VaultPath'; `$env:PORT='$Port'; npx -y @smith-and-web/obsidian-mcp-server"
+$startCmd = "`$env:VAULT_PATH='$VaultPath'; `$env:PORT='$Port'; npx -y --prefer-offline $McpPackage"
 Start-Process -FilePath "powershell.exe" `
     -ArgumentList @("-NoProfile", "-NonInteractive", "-ExecutionPolicy", "Bypass", "-Command", $startCmd) `
     -WindowStyle Hidden | Out-Null
@@ -506,13 +530,17 @@ for ($i = 0; $i -lt 15; $i++) {
 }
 
 if (-not $ok) {
+    Stop-Transcript | Out-Null
     throw "No se pudo iniciar MCP en puerto $Port."
 }
 
 Write-Host "MCP iniciado en puerto $Port."
+Stop-Transcript | Out-Null
 ```
 
 Uso: levantar el server MCP si esta caido. Tambien lo invoca el watchdog.
+
+El paquete MCP esta pineado por defecto a `@smith-and-web/obsidian-mcp-server@^0.1.0`. Si publican una nueva minor (`0.2.x`) con cambios validados por ti, actualizar el parametro `-McpPackage` aqui y en `Enable-MCP-Watchdog.ps1`. No usar `latest` por defecto.
 
 ### 8.5 `Enable-MCP-Watchdog.ps1`
 
@@ -653,7 +681,115 @@ exit 1
 
 Uso: validacion end to end. Salida `[OK]/[WARN]/[FAIL]`. Exit `0` si todo en verde.
 
-### 8.8 Tabla de cuando usar cada script
+### 8.8 `Uninstall-Cursor-Memory.ps1`
+
+```powershell
+param(
+    [string]$VaultPath = "$HOME\Documents\cursor-memory-vault",
+    [string]$CursorMcpPath = "$HOME\.cursor\mcp.json",
+    [string]$WatchdogTaskName = "CursorObsidianMcpWatchdog",
+    [string]$AutoSyncTaskName = "CursorMemoryAutoSync",
+    [switch]$RemoveVault
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Continue"
+
+Write-Host "== Cursor Memory Uninstall ==" -ForegroundColor Cyan
+
+foreach ($taskName in @($WatchdogTaskName, $AutoSyncTaskName)) {
+    cmd /c "schtasks /Query /TN `"$taskName`" >nul 2>nul"
+    if ($LASTEXITCODE -eq 0) {
+        cmd /c "schtasks /Delete /TN `"$taskName`" /F >nul 2>nul" | Out-Null
+        Write-Host "Task eliminada: $taskName"
+    } else {
+        Write-Host "Task no existia: $taskName"
+    }
+}
+
+if (Test-Path -LiteralPath "$CursorMcpPath.bak") {
+    Copy-Item -Path "$CursorMcpPath.bak" -Destination $CursorMcpPath -Force
+    Write-Host "mcp.json restaurado desde $CursorMcpPath.bak"
+} elseif (Test-Path -LiteralPath $CursorMcpPath) {
+    try {
+        $raw = Get-Content -Path $CursorMcpPath -Raw
+        $obj = $raw | ConvertFrom-Json -ErrorAction Stop
+        if ($obj.PSObject.Properties['mcpServers'] -and $obj.mcpServers.PSObject.Properties['obsidian-memory']) {
+            $obj.mcpServers.PSObject.Properties.Remove('obsidian-memory')
+            $obj | ConvertTo-Json -Depth 20 | Set-Content -Path $CursorMcpPath -Encoding UTF8
+            Write-Host "Entrada 'obsidian-memory' removida de mcp.json (sin .bak para restaurar)"
+        }
+    } catch {
+        Write-Host "[WARN] No se pudo editar mcp.json automaticamente. Editalo manualmente."
+    }
+}
+
+if ($RemoveVault.IsPresent) {
+    if (Test-Path -LiteralPath $VaultPath) {
+        Write-Host "[WARN] -RemoveVault dado. Eliminando $VaultPath en 10 segundos. Ctrl+C para abortar."
+        Start-Sleep -Seconds 10
+        Remove-Item -Recurse -Force -LiteralPath $VaultPath
+        Write-Host "Vault eliminado."
+    }
+} else {
+    Write-Host "Vault preservado en $VaultPath. Pasa -RemoveVault para eliminarlo."
+}
+
+Write-Host ""
+Write-Host "Uninstall completado. Reinicia Cursor."
+```
+
+Uso: desinstalar limpio. Por defecto preserva el vault (la memoria). Pasar `-RemoveVault` solo si el usuario lo pide explicitamente.
+
+### 8.9 `Repair.ps1`
+
+```powershell
+param(
+    [string]$VaultPath = "$HOME\Documents\cursor-memory-vault",
+    [string]$CursorMcpPath = "$HOME\.cursor\mcp.json",
+    [int]$Port = 3001
+)
+
+Set-StrictMode -Version Latest
+$ErrorActionPreference = "Stop"
+
+if (-not (Test-Path -LiteralPath $VaultPath)) {
+    throw "Vault no existe en $VaultPath. Corre Setup-Cursor-Memory.ps1, no Repair."
+}
+
+$scriptsDir = Join-Path $VaultPath "scripts\windows"
+$setupScript = Join-Path $scriptsDir "Setup-Cursor-Memory.ps1"
+if (-not (Test-Path -LiteralPath $setupScript)) {
+    throw "No existe $setupScript. Re-pega el prompt original para regenerar scripts."
+}
+
+Write-Host "== Cursor Memory Repair ==" -ForegroundColor Cyan
+Write-Host "Vault existe. Reaplicando mcp.json, tareas y MCP."
+
+$origin = (git -C $VaultPath config --get remote.origin.url).Trim()
+if ([string]::IsNullOrWhiteSpace($origin)) {
+    throw "No hay remote.origin.url en el vault. No se puede continuar."
+}
+
+powershell -ExecutionPolicy Bypass -File $setupScript -RepoUrl $origin -VaultPath $VaultPath -CursorMcpPath $CursorMcpPath -Port $Port
+Write-Host "Repair completado. Reinicia Cursor."
+```
+
+Uso: el vault ya existe y esta sano, pero el resto drifteo (tareas borradas, mcp.json sobreescrito, MCP caido). Lee el remote actual del vault, reaplica todo lo demas, no reclona ni toca contenido.
+
+### 8.10 Logging y rotacion
+
+Ambos scripts con efectos persistentes (`Ensure-ObsidianMCP.ps1`, `Sync-Memory.ps1`) escriben con `Start-Transcript` a:
+
+```text
+%LOCALAPPDATA%\cursor-memory\logs\<script>_YYYY-MM-DD.log
+```
+
+Un archivo por dia, append durante el dia. Para inspeccionar fallos de tareas programadas, leer el log del dia. Para rotar/limpiar, simplemente borrar archivos viejos: una tarea Windows opcional puede hacerlo cada semana, pero por simplicidad esta version del prompt deja el cleanup al usuario.
+
+`SESSION_LOG.md` no rota automaticamente. Recomendacion: cuando supere ~500 lineas, moverlo manualmente a `SESSION_LOG_YYYY-Q<n>.md` y arrancar uno nuevo. El agente debe reconocer ambos formatos al leer.
+
+### 8.11 Tabla de cuando usar cada script
 
 | Caso | Script |
 |------|--------|
@@ -663,6 +799,9 @@ Uso: validacion end to end. Salida `[OK]/[WARN]/[FAIL]`. Exit `0` si todo en ver
 | Recrear watchdog porque dejo de levantar MCP | `Enable-MCP-Watchdog.ps1` |
 | Recrear auto-sync porque dejo de subir | `Enable-AutoSync.ps1` |
 | Diagnostico end-to-end | `Doctor.ps1` |
+| Vault sano pero tareas/mcp.json drifteados | `Repair.ps1` |
+| Desinstalar todo, preservando el vault | `Uninstall-Cursor-Memory.ps1` |
+| Desinstalar todo y borrar el vault | `Uninstall-Cursor-Memory.ps1 -RemoveVault` |
 
 ---
 
@@ -670,7 +809,7 @@ Uso: validacion end to end. Salida `[OK]/[WARN]/[FAIL]`. Exit `0` si todo en ver
 
 Generar este bloque y mostrarlo al usuario tal cual. Indicarle: `Cursor Settings -> Rules -> User Rules -> pegar -> guardar`.
 
-```
+```text
 Reglas de memoria persistente con MCP obsidian-memory.
 
 Antes de cada respuesta sustantiva:
@@ -747,6 +886,8 @@ Criterios de exito:
 | `git commit` falla con "Author identity unknown" | falta `git config --global user.email/name` | configurarlos antes de cualquier commit. |
 | Cursor lista `obsidian-memory` en rojo despues de reiniciar | `mcp-remote` aun no conecto al server | correr `Ensure-ObsidianMCP.ps1` y refrescar la lista MCP en Cursor. |
 | `npx -y mcp-remote` tarda mucho la primera vez | cache npx vacia | esperar ~30s la primera ejecucion, luego es instantaneo. |
+| MCP server arranca pero responde diferente despues de una actualizacion del paquete | `@smith-and-web/obsidian-mcp-server@latest` trajo breaking changes | pinear con `-McpPackage "@smith-and-web/obsidian-mcp-server@<version-conocida>"` en `Ensure-ObsidianMCP.ps1` y recrear el watchdog. |
+| Tarea programada falla pero no hay forma de saber por que | el script no escribia transcript | revisar `%LOCALAPPDATA%\cursor-memory\logs\<script>_YYYY-MM-DD.log`. |
 
 ---
 

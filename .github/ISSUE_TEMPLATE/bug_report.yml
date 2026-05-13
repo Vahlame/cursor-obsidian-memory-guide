@@ -1,0 +1,71 @@
+name: Bug report
+description: Something in the prompt or generated scripts is broken.
+title: "[bug] "
+labels: ["bug", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Thanks for reporting. Before filing, please check `docs/troubleshooting.md` and `PROMPT_ULTRA_COMPLETO.md` section 11.
+  - type: input
+    id: prompt-version
+    attributes:
+      label: Prompt version
+      description: Tag, commit SHA, or "main".
+      placeholder: v1.0.0
+    validations:
+      required: true
+  - type: dropdown
+    id: os
+    attributes:
+      label: Operating System
+      options:
+        - Windows 11
+        - Windows 10
+        - Other (please describe)
+    validations:
+      required: true
+  - type: input
+    id: powershell
+    attributes:
+      label: PowerShell version
+      description: Output of `$PSVersionTable.PSVersion`.
+      placeholder: 5.1.22621.4391
+    validations:
+      required: true
+  - type: input
+    id: node
+    attributes:
+      label: Node version
+      placeholder: v20.11.0
+    validations:
+      required: true
+  - type: input
+    id: cursor
+    attributes:
+      label: Cursor version
+      placeholder: 0.45.x
+    validations:
+      required: true
+  - type: textarea
+    id: what-happened
+    attributes:
+      label: What happened
+      description: Steps you took, what you expected, what actually happened.
+    validations:
+      required: true
+  - type: textarea
+    id: logs
+    attributes:
+      label: Relevant output
+      description: Paste `Doctor.ps1` output, scheduled task output, or terminal errors. Redact paths and any sensitive info.
+      render: shell
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I removed any secrets, tokens, or absolute paths that identify me.
+          required: true
+        - label: I read `docs/troubleshooting.md` and section 11 of the prompt.
+          required: true

@@ -1,0 +1,55 @@
+name: Feature request
+description: Propose a new section, script, or improvement to the prompt or docs.
+title: "[feat] "
+labels: ["enhancement", "triage"]
+body:
+  - type: markdown
+    attributes:
+      value: |
+        Before opening, please confirm your idea is consistent with the project's scope:
+        - Windows-first.
+        - Scripts live inside the prompt as literal text, not as files in this repo.
+        - The agent does the heavy lifting on the user's machine.
+
+        If your idea changes any of the above, please open a discussion first.
+  - type: textarea
+    id: problem
+    attributes:
+      label: Problem
+      description: What's missing or painful today?
+    validations:
+      required: true
+  - type: textarea
+    id: proposal
+    attributes:
+      label: Proposal
+      description: What should change? Be specific about the file and section.
+    validations:
+      required: true
+  - type: textarea
+    id: alternatives
+    attributes:
+      label: Alternatives considered
+    validations:
+      required: false
+  - type: dropdown
+    id: scope
+    attributes:
+      label: Type of change
+      options:
+        - Prompt section (text only)
+        - Generated script
+        - New known-error entry
+        - New ADR / design decision
+        - Docs (README, FAQ, glossary, comparison)
+        - CI / tooling
+        - Other
+    validations:
+      required: true
+  - type: checkboxes
+    id: checks
+    attributes:
+      label: Pre-flight
+      options:
+        - label: I read `CONTRIBUTING.md` and understand this is not a runnable codebase.
+          required: true

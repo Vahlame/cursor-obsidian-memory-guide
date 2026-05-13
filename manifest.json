@@ -1,9 +1,10 @@
 {
-  "$schema": "https://json.schemastore.org/package.json",
+  "$schema": "./schema.json",
   "schemaVersion": 1,
   "name": "cursor-obsidian-memory-guide",
   "title": "Cursor Memory with Obsidian MCP",
   "description": "An operational prompt that lets a Cursor IDE agent set up persistent, cross-device memory for itself using Obsidian MCP and a private GitHub vault on Windows.",
+  "version": "1.0.0",
   "platform": ["windows"],
   "language": ["es", "en"],
   "primaryArtifact": "PROMPT_ULTRA_COMPLETO.md",
@@ -26,7 +27,14 @@
       "path": "README.md",
       "type": "documentation",
       "audience": "human",
-      "purpose": "Onboarding and 30-minute TL;DR for users.",
+      "purpose": "Spanish onboarding and 30-minute TL;DR for users.",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "README.en.md",
+      "type": "documentation",
+      "audience": "human",
+      "purpose": "English onboarding mirror of README.md.",
       "consumeAs": "markdown"
     },
     {
@@ -67,11 +75,88 @@
       "consumeAs": "json"
     },
     {
+      "path": "schema.json",
+      "type": "schema",
+      "audience": "machine",
+      "purpose": "JSON Schema for manifest.json.",
+      "consumeAs": "json"
+    },
+    {
+      "path": "CHANGELOG.md",
+      "type": "documentation",
+      "audience": "any",
+      "purpose": "Versioned history following Keep a Changelog.",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "CONTRIBUTING.md",
+      "type": "documentation",
+      "audience": "human",
+      "purpose": "Contribution guidelines.",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "CODE_OF_CONDUCT.md",
+      "type": "documentation",
+      "audience": "human",
+      "purpose": "Community standards (Contributor Covenant 2.1).",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "SECURITY.md",
+      "type": "documentation",
+      "audience": "human",
+      "purpose": "Vulnerability reporting policy.",
+      "consumeAs": "markdown"
+    },
+    {
       "path": "LICENSE",
       "type": "legal",
       "audience": "any",
       "purpose": "MIT license text.",
       "consumeAs": "text"
+    },
+    {
+      "path": "docs/adr/",
+      "type": "documentation",
+      "audience": "any",
+      "purpose": "Architecture Decision Records for the design choices in section 4 of the prompt.",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "docs/troubleshooting.md",
+      "type": "documentation",
+      "audience": "any",
+      "purpose": "Standalone troubleshooting reference (mirror of prompt section 11).",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "docs/faq.md",
+      "type": "documentation",
+      "audience": "human",
+      "purpose": "Frequently asked questions.",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "docs/glossary.md",
+      "type": "documentation",
+      "audience": "any",
+      "purpose": "Definitions of MCP, SSE, vault, watchdog, and other terms.",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "docs/comparison.md",
+      "type": "documentation",
+      "audience": "human",
+      "purpose": "Comparison of this pattern with Cursor built-in memory, mem0, Letta, MemGPT, and others.",
+      "consumeAs": "markdown"
+    },
+    {
+      "path": "examples/",
+      "type": "example",
+      "audience": "human",
+      "purpose": "Anonymized sample vault content (MEMORY.md, SESSION_LOG.md, PROJECTS/example-app.md).",
+      "consumeAs": "markdown"
     }
   ],
   "architecture": {
@@ -99,17 +184,19 @@
     { "name": "CursorObsidianMcpWatchdog", "everyMinutes": 5, "purpose": "Keep MCP server alive" },
     { "name": "CursorMemoryAutoSync", "everyMinutes": 10, "purpose": "Push vault to GitHub" }
   ],
-  "requiredOnUserMachine": [
-    "Windows",
-    "PowerShell 5.1+",
-    "git",
-    "node",
-    "npm"
-  ],
-  "userInputsRequired": [
-    "Private GitHub repository URL for vault"
-  ],
+  "requiredOnUserMachine": ["Windows", "PowerShell 5.1+", "git", "node", "npm"],
+  "userInputsRequired": ["Private GitHub repository URL for vault"],
   "doNotDoInThisRepo": [
     "Do not clone and run scripts from this repo. Scripts must be generated locally inside the user's private vault, as instructed in PROMPT_ULTRA_COMPLETO.md section 8."
-  ]
+  ],
+  "compatibility": {
+    "cursor": ">=0.45",
+    "windows": ["10", "11"],
+    "powershell": ["5.1", "7.x"],
+    "node": ["18.x", "20.x", "22.x"],
+    "mcpServerPackage": {
+      "name": "@smith-and-web/obsidian-mcp-server",
+      "version": "^0.1.0"
+    }
+  }
 }
