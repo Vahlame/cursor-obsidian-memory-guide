@@ -2,6 +2,21 @@
 
 Este repo queda intencionalmente minimalista: solo lo necesario para integrar memoria persistente en Cursor con Obsidian MCP + GitHub.
 
+## TL;DR (1 pantalla)
+
+1. Crea un repo privado para `cursor-memory-vault`.
+2. Abre chat en Cursor y pega `PROMPT_ULTRA_COMPLETO.md`.
+3. Reemplaza `<REPO_URL_PRIVADO>`.
+4. Deja que el agente configure todo.
+5. Reinicia Cursor.
+6. Verifica:
+
+```powershell
+powershell -ExecutionPolicy Bypass -File ".\scripts\windows\Doctor.ps1"
+```
+
+Si sale en verde, ya quedó.
+
 ## Que hace
 
 - conecta Cursor a `obsidian-memory` via `mcp-remote`;
@@ -82,6 +97,24 @@ El usuario solo da 2 cosas:
 5. Scheduler:
    - `CursorObsidianMcpWatchdog` mantiene MCP arriba.
    - `CursorMemoryAutoSync` sincroniza git automáticamente.
+
+## Mapa de flujo (comunicación)
+
+```mermaid
+flowchart LR
+    U[Usuario] --> C[Cursor Chat]
+    C --> M[mcp-remote]
+    M --> S[Obsidian MCP Server :3001 /sse]
+    S --> V[Vault Markdown local]
+    V --> G[Git local]
+    G --> R[GitHub repo privado]
+    W[Task: MCP Watchdog 5m] --> S
+    A[Task: AutoSync 10m] --> G
+```
+
+Lectura/escritura de memoria:
+- Cursor pide contexto -> MCP -> vault.
+- Agente guarda cambios -> vault -> git -> GitHub.
 
 ## Alcance del repo (sin extras)
 
