@@ -9,8 +9,7 @@ $ErrorActionPreference = "Stop"
 function Test-Health {
     param([int]$HealthPort)
     try {
-        $url = "http://127.0.0.1:$HealthPort/health"
-        $resp = Invoke-WebRequest -Uri $url -UseBasicParsing -TimeoutSec 3
+        $resp = Invoke-WebRequest -Uri "http://127.0.0.1:$HealthPort/health" -UseBasicParsing -TimeoutSec 3
         return ($resp.StatusCode -eq 200)
     } catch {
         return $false
@@ -28,7 +27,7 @@ Start-Process -FilePath "powershell.exe" `
     -WindowStyle Hidden | Out-Null
 
 $ok = $false
-for ($i = 0; $i -lt 12; $i++) {
+for ($i = 0; $i -lt 15; $i++) {
     Start-Sleep -Seconds 2
     if (Test-Health -HealthPort $Port) {
         $ok = $true

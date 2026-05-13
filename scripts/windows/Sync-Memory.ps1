@@ -21,7 +21,7 @@ $status = git -C $VaultPath status --porcelain
 if (-not [string]::IsNullOrWhiteSpace(($status | Out-String))) {
     git -C $VaultPath commit -m $Message
 } else {
-    Write-Host "Sin cambios para commit."
+    Write-Host "Sin cambios locales para commit."
 }
 
 git -C $VaultPath pull --rebase origin $Branch

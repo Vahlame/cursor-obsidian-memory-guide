@@ -11,12 +11,12 @@ if ($EveryMinutes -lt 5) {
     throw "EveryMinutes debe ser >= 5."
 }
 
-$syncScript = Join-Path $VaultPath "cursor-install\sync-memory.ps1"
+$syncScript = Join-Path $VaultPath "scripts\windows\Sync-Memory.ps1"
 if (-not (Test-Path -LiteralPath $syncScript)) {
     throw "No existe: $syncScript"
 }
 
-$hiddenRunner = Join-Path $VaultPath "cursor-install\run-sync-hidden.vbs"
+$hiddenRunner = Join-Path $VaultPath "scripts\windows\run-sync-hidden.vbs"
 $vbsContent = @"
 Set shell = CreateObject("WScript.Shell")
 cmd = "powershell.exe -NoProfile -NonInteractive -ExecutionPolicy Bypass -File ""$syncScript"" -VaultPath ""$VaultPath"""
@@ -32,4 +32,4 @@ if ($LASTEXITCODE -ne 0) {
     throw "No se pudo crear task $TaskName."
 }
 
-Write-Host "Auto-sync activado: $TaskName cada $EveryMinutes min"
+Write-Host "Auto-sync activado: $TaskName cada $EveryMinutes minutos."

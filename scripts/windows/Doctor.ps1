@@ -12,7 +12,6 @@ function Warn($msg) { Write-Host "[WARN] $msg" -ForegroundColor Yellow }
 function Fail($msg) { Write-Host "[FAIL] $msg" -ForegroundColor Red }
 
 $hasError = $false
-
 Write-Host "== Cursor Memory Doctor ==" -ForegroundColor Cyan
 
 if (Get-Command git -ErrorAction SilentlyContinue) { Ok "Git disponible" } else { Fail "Git no disponible"; $hasError = $true }
@@ -47,5 +46,5 @@ if (-not $hasError) {
     exit 0
 }
 
-Fail "Diagnostico encontro problemas. Revisa docs/troubleshooting.md"
+Fail "Hay problemas. Re-ejecuta setup o scripts de repair."
 exit 1
